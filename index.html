@@ -1,114 +1,108 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Chat + Compartir Pantalla</title>
-<style>
-  body { font-family: sans-serif; background: #f5f5f5; padding: 0; margin: 0; }
-  #chat { border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px; background: #fff; }
-  #messageInput { width: 80%; padding: 8px; }
-  #sendBtn, #shareScreenBtn { padding: 8px 12px; }
-  video { margin-top: 10px; width: 100%; max-height: 200px; }
-  #typing { font-style: italic; color: gray; margin: 5px; }
-</style>
+  <meta charset="UTF-8" />
+  <title>Chat + Compartir Pantalla</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+    }
+    #chat {
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: white;
+      height: 300px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    #messageInput {
+      width: 80%;
+      padding: 8px;
+    }
+    #sendBtn {
+      padding: 8px 12px;
+    }
+    video {
+      margin-top: 20px;
+      max-width: 100%;
+      border: 1px solid #333;
+    }
+    #typingStatus {
+      font-style: italic;
+      color: gray;
+      margin-bottom: 10px;
+    }
+  </style>
 </head>
 <body>
-<h2>Chat + Compartir Pantalla</h2>
-<div id="chat"></div>
-<div id="typing"></div>
-<input type="text" id="messageInput" placeholder="Escribe tu mensaje...">
-<button id="sendBtn">Enviar</button>
-<br><br>
-<button id="shareScreenBtn">Compartir pantalla</button>
-<video id="screenVideo" autoplay muted></video>
+  <h2>Chat + Compartir Pantalla (Offline)</h2>
 
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<script>
-const chatDiv = document.getElementById('chat');
-const messageInput = document.getElementById('messageInput');
-const sendBtn = document.getElementById('sendBtn');
-const typingDiv = document.getElementById('typing');
-const shareBtn = document.getElementById('shareScreenBtn');
-const screenVideo = document.getElementById('screenVideo');
+  <div id="chat"></div>
+  <div id="typingStatus"></div>
+  <input type="text" id="messageInput" placeholder="Escribe tu mensaje..." />
+  <button id="sendBtn">Enviar</button>
 
-let myName = prompt("Escribe tu nombre:");
-const peer = new Peer();
-let conn;
+  <br /><br />
+  <button id="shareScreenBtn">Compartir pantalla</button>
+  <video id="screenVideo" autoplay muted></video>
 
-peer.on('open', id => {
-  const p = document.createElement('p');
-  p.textContent = `Tu ID es: ${id}`;
-  chatDiv.appendChild(p);
-});
+  <script>
+    const chatDiv = document.getElementById('chat');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const typingStatus = document.getElementById('typingStatus');
 
-document.addEventListener("keypress", e => {
-  if (e.key === "Enter") sendBtn.click();
-});
+    const myName = prompt("Introduce tu nombre:") || "Anónimo";
 
-sendBtn.onclick = () => {
-  const msg = messageInput.value.trim();
-  if (msg) {
-    const hora = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    appendMsg(`${myName} [${hora}]: ${msg}`);
-    if (conn) conn.send({type: 'msg', name: myName, text: msg, time: hora});
-    messageInput.value = '';
-  }
-};
-
-function appendMsg(text) {
-  const p = document.createElement('p');
-  p.textContent = text;
-  chatDiv.appendChild(p);
-  chatDiv.scrollTop = chatDiv.scrollHeight;
-}
-
-messageInput.addEventListener("input", () => {
-  if (conn) conn.send({type: 'typing', name: myName});
-});
-
-peer.on('connection', c => {
-  conn = c;
-  conn.on('data', data => {
-    if (data.type === 'msg') {
-      appendMsg(`${data.name} [${data.time}]: ${data.text}`);
+    function appendMessage(text) {
+      const p = document.createElement('p');
+      p.textContent = text;
+      chatDiv.appendChild(p);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
     }
-    if (data.type === 'typing') {
-      typingDiv.textContent = `${data.name} está escribiendo...`;
-      clearTimeout(typingDiv.timeout);
-      typingDiv.timeout = setTimeout(() => typingDiv.textContent = '', 2000);
-    }
-  });
-  conn.on('open', () => appendMsg('[Conectado]'));
-});
 
-function connectToPeer(otherId) {
-  conn = peer.connect(otherId);
-  conn.on('data', data => {
-    if (data.type === 'msg') {
-      appendMsg(`${data.name} [${data.time}]: ${data.text}`);
+    function getCurrentTime() {
+      const now = new Date();
+      return now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     }
-    if (data.type === 'typing') {
-      typingDiv.textContent = `${data.name} está escribiendo...`;
-      clearTimeout(typingDiv.timeout);
-      typingDiv.timeout = setTimeout(() => typingDiv.textContent = '', 2000);
-    }
-  });
-  conn.on('open', () => appendMsg('[Conectado]'));
-}
 
-shareBtn.onclick = async () => {
-  try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-    screenVideo.srcObject = stream;
-    stream.getVideoTracks()[0].onended = () => alert("Has dejado de compartir la pantalla.");
-  } catch (err) {
-    alert("Error al compartir pantalla: " + err.message);
-  }
-};
+    sendBtn.onclick = () => {
+      const msg = messageInput.value.trim();
+      if (msg) {
+        const time = getCurrentTime();
+        appendMessage(`${myName} [${time}]: ${msg}`);
+        messageInput.value = '';
+        typingStatus.textContent = '';
+      }
+    };
 
-// Conectar a otro peer manual
-const connectId = prompt("Si quieres unirte a otro, introduce su ID (o deja vacío):");
-if (connectId) connectToPeer(connectId);
-</script>
+    messageInput.addEventListener("keypress", function (e) {
+      if (e.key === "Enter") sendBtn.click();
+    });
+
+    let typingTimeout;
+
+    messageInput.addEventListener("input", () => {
+      typingStatus.textContent = `${myName} está escribiendo...`;
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => typingStatus.textContent = '', 2000);
+    });
+
+    const shareBtn = document.getElementById('shareScreenBtn');
+    const screenVideo = document.getElementById('screenVideo');
+
+    shareBtn.onclick = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        screenVideo.srcObject = stream;
+        stream.getVideoTracks()[0].onended = () => alert("Has dejado de compartir pantalla.");
+      } catch (err) {
+        alert("Error al intentar compartir pantalla: " + err.message);
+      }
+    };
+  </script>
 </body>
 </html>
