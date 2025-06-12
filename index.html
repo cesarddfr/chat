@@ -95,18 +95,22 @@
       if (e.key === "Enter") sendBtn.click();
     });
 
-    // Compartir pantalla
+    // Compartir pantalla mejorado
     const shareScreenBtn = document.getElementById("shareScreenBtn");
     const remoteVideo = document.getElementById("remoteVideo");
 
     shareScreenBtn.onclick = async () => {
       if (Object.keys(connections).length === 0) return alert("Conéctate con alguien primero");
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        for (let friendId in connections) {
-          const call = peer.call(friendId, stream);
-          call.on("close", () => alert("Pantalla dejada de compartir"));
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        for (const friendId of Object.keys(connections)) {
+          const call = peer.call(friendId, screenStream);
+          call.on("error", (err) => console.error("Error en la llamada", err));
         }
+
+        screenStream.getVideoTracks()[0].addEventListener("ended", () => {
+          alert("Has dejado de compartir la pantalla.");
+        });
       } catch (err) {
         alert("Error al compartir pantalla: " + err.message);
       }
@@ -117,7 +121,9 @@
       call.on("stream", remoteStream => {
         remoteVideo.srcObject = remoteStream;
       });
-      call.on("close", () => remoteVideo.srcObject = null);
+      call.on("close", () => {
+        remoteVideo.srcObject = null;
+      });
     });
   </script>
 </body>
