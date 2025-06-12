@@ -1,138 +1,123 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Chat + Compartir Pantalla (P2P Mejorado)</title>
+  <meta charset="UTF-8">
+  <title>Chat P2P + Compartir Pantalla</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f9f9f9;
-      margin: 0;
-      padding: 20px;
-    }
-    #chat {
-      border: 1px solid #ccc;
-      background: white;
-      height: 200px;
-      overflow-y: auto;
-      margin-bottom: 10px;
-      padding: 5px;
-    }
-    #myId, #myName {
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    input, button {
-      padding: 6px;
-      margin: 3px 0;
-    }
-    video {
-      width: 300px;
-      border: 1px solid #333;
-      margin-top: 10px;
-    }
+    body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
+    #chat { border: 1px solid #ccc; background: #fff; height: 250px; overflow-y: auto; margin-bottom: 8px; padding: 5px; }
+    input, button { padding: 5px; margin: 3px; }
+    #friends { margin-bottom: 10px; }
+    video { width: 300px; margin-top: 10px; border: 1px solid #333; }
   </style>
 </head>
 <body>
-  <h2>Chat + Compartir Pantalla (P2P con PeerJS)</h2>
+  <h2>Chat P2P + Compartir Pantalla</h2>
 
-  <div id="myName"></div>
-  <div id="myId"></div>
+  <div id="userInfo"></div>
 
-  <label for="peerId">Conectar con:</label>
-  <input type="text" id="peerId" placeholder="ID del amigo" />
-  <button id="connectBtn">Conectar</button>
+  <div id="friends">
+    <input type="text" id="friendName" placeholder="Nombre del amigo">
+    <button id="addFriendBtn">Añadir amigo</button>
+  </div>
+
+  <div id="friendList"></div>
 
   <div id="chat"></div>
 
-  <input type="text" id="messageInput" placeholder="Escribe tu mensaje..." />
+  <input type="text" id="messageInput" placeholder="Mensaje">
   <button id="sendBtn">Enviar</button>
 
-  <br><br>
-  <button id="shareScreenBtn">Compartir Pantalla</button><br>
+  <br>
+  <button id="shareScreenBtn">Compartir pantalla</button>
   <video id="remoteVideo" autoplay muted></video>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    let userName = prompt("¿Cuál es tu nombre o alias?");
-    if (!userName) userName = "Anónimo";
-    document.getElementById('myName').textContent = "Tu nombre: " + userName;
+    const userName = prompt("Pon tu nombre (único para este chat):") || ("user" + Math.floor(Math.random() * 1000));
+    const myId = `chat-${userName}`;
+    document.getElementById("userInfo").textContent = `Tu nombre: ${userName} (ID: ${myId})`;
 
-    const myIdDiv = document.getElementById('myId');
-    const connectBtn = document.getElementById('connectBtn');
-    const peerIdInput = document.getElementById('peerId');
-    const chatDiv = document.getElementById('chat');
-    const messageInput = document.getElementById('messageInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const shareScreenBtn = document.getElementById('shareScreenBtn');
-    const remoteVideo = document.getElementById('remoteVideo');
+    const peer = new Peer(myId);
+    let connections = {};
 
-    const peer = new Peer();
-    let conn;
+    const chatDiv = document.getElementById("chat");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const friendList = document.getElementById("friendList");
 
-    peer.on('open', id => {
-      myIdDiv.textContent = "Tu ID: " + id;
+    function addMessage(msg) {
+      const p = document.createElement("p");
+      p.textContent = msg;
+      chatDiv.appendChild(p);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+
+    peer.on("connection", conn => {
+      connections[conn.peer] = conn;
+      conn.on("data", data => addMessage(`${data.name}: ${data.text}`));
+      conn.on("close", () => delete connections[conn.peer]);
+      addMessage(`🔔 Conectado con ${conn.peer}`);
     });
 
-    peer.on('connection', connection => {
-      conn = connection;
-      conn.on('data', data => {
-        addMessage(data.name + ": " + data.text);
-      });
-    });
+    document.getElementById("addFriendBtn").onclick = () => {
+      const friendName = document.getElementById("friendName").value.trim();
+      if (!friendName) return;
+      const friendId = `chat-${friendName}`;
 
-    connectBtn.onclick = () => {
-      const id = peerIdInput.value.trim();
-      if (id) {
-        conn = peer.connect(id);
-        conn.on('open', () => addMessage("✅ Conectado con: " + id));
-        conn.on('data', data => addMessage(data.name + ": " + data.text));
-      }
+      const friendBtn = document.createElement("button");
+      friendBtn.textContent = `Conectar a ${friendName}`;
+      friendBtn.onclick = () => {
+        if (connections[friendId]) return addMessage(`Ya estás conectado con ${friendName}`);
+        const conn = peer.connect(friendId);
+        conn.on("open", () => {
+          connections[friendId] = conn;
+          addMessage(`✅ Conectado con ${friendName}`);
+          conn.on("data", data => addMessage(`${data.name}: ${data.text}`));
+          conn.on("close", () => delete connections[friendId]);
+        });
+      };
+      friendList.appendChild(friendBtn);
+      document.getElementById("friendName").value = "";
     };
 
     sendBtn.onclick = () => {
       const msg = messageInput.value.trim();
-      if (msg && conn && conn.open) {
-        conn.send({ name: userName, text: msg });
-        addMessage("Tú: " + msg);
-        messageInput.value = '';
+      if (!msg) return;
+      for (let id in connections) {
+        connections[id].send({ name: userName, text: msg });
       }
+      addMessage(`Tú: ${msg}`);
+      messageInput.value = "";
     };
 
     messageInput.addEventListener("keypress", e => {
       if (e.key === "Enter") sendBtn.click();
     });
 
-    function addMessage(text) {
-      const p = document.createElement('p');
-      p.textContent = text;
-      chatDiv.appendChild(p);
-      chatDiv.scrollTop = chatDiv.scrollHeight;
-    }
+    // Compartir pantalla
+    const shareScreenBtn = document.getElementById("shareScreenBtn");
+    const remoteVideo = document.getElementById("remoteVideo");
 
-    // Compartir pantalla mejorado
     shareScreenBtn.onclick = async () => {
-      const peerId = peerIdInput.value.trim();
-      if (!peerId) return alert("Debes conectarte con el ID del amigo primero.");
-
+      if (Object.keys(connections).length === 0) return alert("Conéctate con alguien primero");
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        const call = peer.call(peerId, stream);
-        call.on('close', () => alert("Compartir pantalla finalizado"));
-        call.on('error', err => alert("Error en la transmisión: " + err.message));
+        for (let friendId in connections) {
+          const call = peer.call(friendId, stream);
+          call.on("close", () => alert("Pantalla dejada de compartir"));
+        }
       } catch (err) {
         alert("Error al compartir pantalla: " + err.message);
       }
     };
 
-    peer.on('call', call => {
-      call.answer(); // Responde para recibir el stream
-      call.on('stream', remoteStream => {
+    peer.on("call", call => {
+      call.answer();
+      call.on("stream", remoteStream => {
         remoteVideo.srcObject = remoteStream;
       });
-      call.on('close', () => {
-        remoteVideo.srcObject = null;
-      });
+      call.on("close", () => remoteVideo.srcObject = null);
     });
   </script>
 </body>
