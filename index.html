@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chat + Compartir Pantalla (P2P)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      margin: 0;
+      padding: 20px;
+    }
+    #chat {
+      border: 1px solid #ccc;
+      background: white;
+      height: 200px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      padding: 5px;
+    }
+    #myId {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    input, button {
+      padding: 6px;
+      margin: 3px 0;
+    }
+    video {
+      width: 300px;
+      border: 1px solid #333;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Chat + Compartir Pantalla (P2P con PeerJS)</h2>
+
+  <div id="myId"></div>
+
+  <label for="peerId">Conectar con:</label>
+  <input type="text" id="peerId" placeholder="ID del amigo" />
+  <button id="connectBtn">Conectar</button>
+
+  <div id="chat"></div>
+
+  <input type="text" id="messageInput" placeholder="Escribe tu mensaje..." />
+  <button id="sendBtn">Enviar</button>
+
+  <br><br>
+  <button id="shareScreenBtn">Compartir Pantalla</button><br>
+  <video id="remoteVideo" autoplay muted></video>
+
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script>
+    const myIdDiv = document.getElementById('myId');
+    const connectBtn = document.getElementById('connectBtn');
+    const peerIdInput = document.getElementById('peerId');
+    const chatDiv = document.getElementById('chat');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const shareScreenBtn = document.getElementById('shareScreenBtn');
+    const remoteVideo = document.getElementById('remoteVideo');
+
+    const peer = new Peer();
+    let conn;
+
+    peer.on('open', id => {
+      myIdDiv.textContent = "Tu ID: " + id;
+    });
+
+    peer.on('connection', connection => {
+      conn = connection;
+      conn.on('data', msg => {
+        addMessage("Amigo: " + msg);
+      });
+    });
+
+    connectBtn.onclick = () => {
+      const id = peerIdInput.value.trim();
+      if (id) {
+        conn = peer.connect(id);
+        conn.on('open', () => addMessage("✅ Conectado con: " + id));
+        conn.on('data', msg => addMessage("Amigo: " + msg));
+      }
+    };
+
+    sendBtn.onclick = () => {
+      const msg = messageInput.value.trim();
+      if (msg && conn && conn.open) {
+        conn.send(msg);
+        addMessage("Tú: " + msg);
+        messageInput.value = '';
+      }
+    };
+
+    messageInput.addEventListener("keypress", e => {
+      if (e.key === "Enter") sendBtn.click();
+    });
+
+    function addMessage(text) {
+      const p = document.createElement('p');
+      p.textContent = text;
+      chatDiv.appendChild(p);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+
+    // Compartir pantalla
+    shareScreenBtn.onclick = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const call = peer.call(peerIdInput.value.trim(), stream);
+      } catch (err) {
+        alert("Error al compartir pantalla: " + err.message);
+      }
+    };
+
+    peer.on('call', call => {
+      call.answer(); // No mandamos nuestro video, solo recibimos el de pantalla compartida
+      call.on('stream', remoteStream => {
+        remoteVideo.srcObject = remoteStream;
+      });
+    });
+  </script>
+</body>
+</html>
