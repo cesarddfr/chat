@@ -29,10 +29,9 @@
   <input type="text" id="messageInput" placeholder="Mensaje">
   <button id="sendBtn">Enviar</button>
 
-  <!-- BOTONES DE DESARROLLADOR (inicialmente ocultos) -->
+  <!-- CONTROLES DE DESARROLLADOR -->
   <div id="devControls" class="hidden">
     <button id="clearChatBtn">Borrar conversación</button>
-    <button id="kickBtn">Expulsar a todos</button>
   </div>
 
   <br>
@@ -40,11 +39,11 @@
   <video id="remoteVideo" autoplay muted></video>
 
   <br><br>
-  <button id="devModeBtn">Modo desarrollador</button> <!-- Botón para activar el modo desarrollador -->
+  <button id="devModeBtn">Modo desarrollador</button>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    const PASSWORD = "1234"; // <<< Cambia esta contraseña a la que desees
+    const PASSWORD = "1234"; // Cambia la contraseña aquí si quieres
 
     const userName = prompt("Pon tu nombre (único para este chat):") || ("user" + Math.floor(Math.random() * 1000));
     const myId = `chat-${userName}`;
@@ -59,7 +58,6 @@
     const friendList = document.getElementById("friendList");
 
     const clearChatBtn = document.getElementById("clearChatBtn");
-    const kickBtn = document.getElementById("kickBtn");
     const devControls = document.getElementById("devControls");
     const devModeBtn = document.getElementById("devModeBtn");
 
@@ -70,11 +68,63 @@
       chatDiv.scrollTop = chatDiv.scrollHeight;
     }
 
+    // Función para añadir el botón de expulsión para cada conexión
+    function updateFriendControls(friendId) {
+      let existing = document.getElementById(`friend-${friendId}`);
+      if (existing) return;
+
+      const container = document.createElement("div");
+      container.id = `friend-${friendId}`;
+      container.style.marginBottom = "5px";
+
+      const label = document.createElement("span");
+      label.textContent = `Conectado con ${friendId.replace("chat-", "")} `;
+
+      const kickBtn = document.createElement("button");
+      kickBtn.textContent = "Expulsar";
+      kickBtn.classList.add("hidden");
+      kickBtn.onclick = () => {
+        if (connections[friendId]) {
+          try {
+            connections[friendId].send({ type: "expulsion", reason: "Has sido expulsado del chat por el administrador." });
+          } catch (e) {}
+          connections[friendId].close();
+          delete connections[friendId];
+          addMessage(`⚠️ Has expulsado a ${friendId.replace("chat-", "")}`);
+          container.remove();
+        }
+      };
+
+      container.appendChild(label);
+      container.appendChild(kickBtn);
+      friendList.appendChild(container);
+
+      // Si el modo desarrollador ya está activo, muestra el botón
+      if (!devControls.classList.contains("hidden")) kickBtn.classList.remove("hidden");
+    }
+
     peer.on("connection", conn => {
       connections[conn.peer] = conn;
-      conn.on("data", data => addMessage(`${data.name}: ${data.text}`));
-      conn.on("close", () => delete connections[conn.peer]);
-      addMessage(`🔔 Conectado con ${conn.peer}`);
+      updateFriendControls(conn.peer);
+
+      conn.on("data", data => {
+        if (data.type === "expulsion") {
+          alert(data.reason);
+          conn.close();
+          addMessage("❌ Has sido expulsado de la conversación.");
+          return;
+        }
+        if (data.name && data.text) addMessage(`${data.name}: ${data.text}`);
+      });
+
+      conn.on("close", () => {
+        delete connections[conn.peer];
+        const friendEl = document.getElementById(`friend-${conn.peer}`);
+        if (friendEl) friendEl.remove();
+        addMessage(`❌ ${conn.peer.replace("chat-", "")} se ha desconectado.`);
+      });
+
+      addMessage(`🔔 Conectado con ${conn.peer.replace("chat-", "")}`);
     });
 
     document.getElementById("addFriendBtn").onclick = () => {
@@ -82,19 +132,31 @@
       if (!friendName) return;
       const friendId = `chat-${friendName}`;
 
-      const friendBtn = document.createElement("button");
-      friendBtn.textContent = `Conectar a ${friendName}`;
-      friendBtn.onclick = () => {
-        if (connections[friendId]) return addMessage(`Ya estás conectado con ${friendName}`);
-        const conn = peer.connect(friendId);
-        conn.on("open", () => {
-          connections[friendId] = conn;
-          addMessage(`✅ Conectado con ${friendName}`);
-          conn.on("data", data => addMessage(`${data.name}: ${data.text}`));
-          conn.on("close", () => delete connections[friendId]);
+      const conn = peer.connect(friendId);
+      conn.on("open", () => {
+        connections[friendId] = conn;
+        updateFriendControls(friendId);
+
+        conn.on("data", data => {
+          if (data.type === "expulsion") {
+            alert(data.reason);
+            conn.close();
+            addMessage("❌ Has sido expulsado de la conversación.");
+            return;
+          }
+          if (data.name && data.text) addMessage(`${data.name}: ${data.text}`);
         });
-      };
-      friendList.appendChild(friendBtn);
+
+        conn.on("close", () => {
+          delete connections[friendId];
+          const friendEl = document.getElementById(`friend-${friendId}`);
+          if (friendEl) friendEl.remove();
+          addMessage(`❌ ${friendName} se ha desconectado.`);
+        });
+
+        addMessage(`✅ Conectado con ${friendName}`);
+      });
+
       document.getElementById("friendName").value = "";
     };
 
@@ -142,25 +204,16 @@
       });
     });
 
-    // Función borrar conversación
     clearChatBtn.onclick = () => {
       chatDiv.innerHTML = "";
     };
 
-    // Función expulsar a todos (cierra todas las conexiones)
-    kickBtn.onclick = () => {
-      for (let id in connections) {
-        connections[id].close();
-        delete connections[id];
-      }
-      addMessage("⚠️ Todos los usuarios han sido expulsados.");
-    };
-
-    // Activar modo desarrollador (con contraseña)
     devModeBtn.onclick = () => {
       const pwd = prompt("Introduce la contraseña:");
       if (pwd === PASSWORD) {
         devControls.classList.remove("hidden");
+        // Mostrar botones de expulsión si hay conexiones
+        document.querySelectorAll("#friendList button").forEach(btn => btn.classList.remove("hidden"));
         addMessage("🔑 Modo desarrollador activado.");
       } else {
         alert("❌ Contraseña incorrecta");
