@@ -9,6 +9,7 @@
     input, button { padding: 5px; margin: 3px; }
     #friends { margin-bottom: 10px; }
     video { width: 300px; margin-top: 10px; border: 1px solid #333; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
@@ -28,12 +29,23 @@
   <input type="text" id="messageInput" placeholder="Mensaje">
   <button id="sendBtn">Enviar</button>
 
+  <!-- BOTONES DE DESARROLLADOR (inicialmente ocultos) -->
+  <div id="devControls" class="hidden">
+    <button id="clearChatBtn">Borrar conversación</button>
+    <button id="kickBtn">Expulsar a todos</button>
+  </div>
+
   <br>
   <button id="shareScreenBtn">Compartir pantalla</button>
   <video id="remoteVideo" autoplay muted></video>
 
+  <br><br>
+  <button id="devModeBtn">Modo desarrollador</button> <!-- Botón para activar el modo desarrollador -->
+
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
+    const PASSWORD = "1234"; // <<< Cambia esta contraseña a la que desees
+
     const userName = prompt("Pon tu nombre (único para este chat):") || ("user" + Math.floor(Math.random() * 1000));
     const myId = `chat-${userName}`;
     document.getElementById("userInfo").textContent = `Tu nombre: ${userName} (ID: ${myId})`;
@@ -45,6 +57,11 @@
     const messageInput = document.getElementById("messageInput");
     const sendBtn = document.getElementById("sendBtn");
     const friendList = document.getElementById("friendList");
+
+    const clearChatBtn = document.getElementById("clearChatBtn");
+    const kickBtn = document.getElementById("kickBtn");
+    const devControls = document.getElementById("devControls");
+    const devModeBtn = document.getElementById("devModeBtn");
 
     function addMessage(msg) {
       const p = document.createElement("p");
@@ -95,7 +112,6 @@
       if (e.key === "Enter") sendBtn.click();
     });
 
-    // Compartir pantalla mejorado
     const shareScreenBtn = document.getElementById("shareScreenBtn");
     const remoteVideo = document.getElementById("remoteVideo");
 
@@ -125,9 +141,31 @@
         remoteVideo.srcObject = null;
       });
     });
+
+    // Función borrar conversación
+    clearChatBtn.onclick = () => {
+      chatDiv.innerHTML = "";
+    };
+
+    // Función expulsar a todos (cierra todas las conexiones)
+    kickBtn.onclick = () => {
+      for (let id in connections) {
+        connections[id].close();
+        delete connections[id];
+      }
+      addMessage("⚠️ Todos los usuarios han sido expulsados.");
+    };
+
+    // Activar modo desarrollador (con contraseña)
+    devModeBtn.onclick = () => {
+      const pwd = prompt("Introduce la contraseña:");
+      if (pwd === PASSWORD) {
+        devControls.classList.remove("hidden");
+        addMessage("🔑 Modo desarrollador activado.");
+      } else {
+        alert("❌ Contraseña incorrecta");
+      }
+    };
   </script>
 </body>
 </html>
-
-
-
