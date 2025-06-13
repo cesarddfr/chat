@@ -8,7 +8,6 @@
     #chat { border: 1px solid #ccc; background: #fff; height: 250px; overflow-y: auto; margin-bottom: 8px; padding: 5px; }
     input, button { padding: 5px; margin: 3px; }
     #friends { margin-bottom: 10px; }
-    video { width: 300px; margin-top: 10px; border: 1px solid #333; }
     .hidden { display: none; }
   </style>
 </head>
@@ -29,43 +28,42 @@
   <input type="text" id="messageInput" placeholder="Mensaje">
   <button id="sendBtn">Enviar</button>
 
+  <input type="file" id="fileInput" class="hidden">
+  <button id="sendFileBtn">📁 Enviar archivo</button>
+
   <div id="devControls" class="hidden">
-    <button id="clearChatBtn">Borrar conversación (para todos)</button>
+    <button id="clearChatBtn">🗑 Borrar conversación (para todos)</button>
     <button id="panicBtn">⚠️ Botón del pánico</button>
   </div>
-
-  <br>
-  <input type="file" id="fileInput" class="hidden">
-  <button id="sendFileBtn">Enviar archivo</button>
 
   <br><br>
   <button id="devModeBtn">Modo desarrollador</button>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    const PASSWORD = "1234";
+    const PASSWORD = "0011";
     const userName = prompt("Pon tu nombre (único para este chat):") || ("user" + Math.floor(Math.random() * 1000));
     const myId = `chat-${userName}`;
     document.getElementById("userInfo").textContent = `Tu nombre: ${userName} (ID: ${myId})`;
 
     const peer = new Peer(myId);
-    let connections = {};
+    const connections = {};
 
     const chatDiv = document.getElementById("chat");
     const messageInput = document.getElementById("messageInput");
     const sendBtn = document.getElementById("sendBtn");
     const friendList = document.getElementById("friendList");
+    const fileInput = document.getElementById("fileInput");
+    const sendFileBtn = document.getElementById("sendFileBtn");
+
     const clearChatBtn = document.getElementById("clearChatBtn");
     const panicBtn = document.getElementById("panicBtn");
     const devControls = document.getElementById("devControls");
     const devModeBtn = document.getElementById("devModeBtn");
-    const fileInput = document.getElementById("fileInput");
-    const sendFileBtn = document.getElementById("sendFileBtn");
 
-    function addMessage(msg, isHtml = false) {
+    function addMessage(msg) {
       const p = document.createElement("p");
-      if (isHtml) p.innerHTML = msg;
-      else p.textContent = msg;
+      p.textContent = msg;
       chatDiv.appendChild(p);
       chatDiv.scrollTop = chatDiv.scrollHeight;
     }
@@ -77,9 +75,8 @@
     function activatePanic() {
       document.body.innerHTML = "<h1>🚨 Emergencia. Página cerrada. 🚨</h1>";
       setTimeout(() => {
-        window.close();
-        window.location.href = "about:blank";
-      }, 1000);
+        location.href = "https://classroom.google.com";
+      }, 800);
     }
 
     function addFriendControl(friendId) {
@@ -95,15 +92,11 @@
       kickBtn.classList.add("hidden");
       kickBtn.onclick = () => {
         if (confirm(`¿Seguro que quieres expulsar a ${friendId.replace("chat-", "")}?`)) {
-          if (connections[friendId]) {
-            try {
-              connections[friendId].send({ type: "expulsion" });
-            } catch (e) {}
-            connections[friendId].close();
-            delete connections[friendId];
-            addMessage(`⚠️ Has expulsado a ${friendId.replace("chat-", "")}`);
-            container.remove();
-          }
+          connections[friendId]?.send({ type: "expulsion" });
+          connections[friendId]?.close();
+          delete connections[friendId];
+          addMessage(`⚠️ Has expulsado a ${friendId.replace("chat-", "")}`);
+          container.remove();
         }
       };
 
@@ -122,44 +115,41 @@
         if (data.type === "expulsion") {
           conn.close();
           addMessage("❌ Has sido expulsado de la conversación.");
-          return;
-        }
-        if (data.type === "clearChat") {
+        } else if (data.type === "clearChat") {
           clearChatLocal();
           addMessage("🗑 Administrador borró el chat.");
-          return;
-        }
-        if (data.type === "panic") {
+        } else if (data.type === "panic") {
           activatePanic();
-          return;
-        }
-        if (data.type === "file") {
-          const blob = new Blob([data.fileData]);
-          const url = URL.createObjectURL(blob);
-          addMessage(`${data.name} envió un archivo: <a href="${url}" download="${data.fileName}">${data.fileName}</a>`, true);
-          return;
-        }
-        if (data.name && data.text) {
+        } else if (data.type === "file") {
+          const link = document.createElement("a");
+          link.href = data.url;
+          link.download = data.fileName;
+          link.textContent = `📎 Archivo recibido: ${data.fileName}`;
+          const p = document.createElement("p");
+          p.appendChild(link);
+          chatDiv.appendChild(p);
+          chatDiv.scrollTop = chatDiv.scrollHeight;
+        } else if (data.name && data.text) {
           addMessage(`${data.name}: ${data.text}`);
         }
       });
 
       conn.on("close", () => {
         delete connections[conn.peer];
-        const el = document.getElementById(`friend-${conn.peer}`);
-        if (el) el.remove();
+        document.getElementById(`friend-${conn.peer}`)?.remove();
         addMessage(`❌ ${conn.peer.replace("chat-", "")} se ha desconectado.`);
       });
 
       addMessage(`🔔 Conectado con ${conn.peer.replace("chat-", "")}`);
     }
 
-    peer.on("connection", conn => setupConnection(conn));
+    peer.on("connection", setupConnection);
 
     document.getElementById("addFriendBtn").onclick = () => {
       const friendName = document.getElementById("friendName").value.trim();
       if (!friendName) return;
       const friendId = `chat-${friendName}`;
+
       const conn = peer.connect(friendId);
       conn.on("open", () => setupConnection(conn));
       document.getElementById("friendName").value = "";
@@ -168,7 +158,7 @@
     sendBtn.onclick = () => {
       const msg = messageInput.value.trim();
       if (!msg) return;
-      for (let id in connections) {
+      for (const id in connections) {
         connections[id].send({ name: userName, text: msg });
       }
       addMessage(`Tú: ${msg}`);
@@ -179,26 +169,29 @@
       if (e.key === "Enter") sendBtn.click();
     });
 
-    sendFileBtn.onclick = () => {
-      if (Object.keys(connections).length === 0) return alert("Conéctate con alguien primero");
-      fileInput.click();
-    };
+    sendFileBtn.onclick = () => fileInput.click();
 
     fileInput.onchange = () => {
       const file = fileInput.files[0];
       if (!file) return;
+
       const reader = new FileReader();
       reader.onload = () => {
-        const arrayBuffer = reader.result;
-        for (let id in connections) {
-          connections[id].send({
-            type: "file",
-            name: userName,
-            fileName: file.name,
-            fileData: arrayBuffer
-          });
+        const blob = new Blob([reader.result]);
+        const url = URL.createObjectURL(blob);
+
+        for (const id in connections) {
+          connections[id].send({ type: "file", fileName: file.name, url });
         }
-        addMessage(`📁 Tú enviaste un archivo: ${file.name}`);
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = file.name;
+        link.textContent = `📎 Tú enviaste: ${file.name}`;
+        const p = document.createElement("p");
+        p.appendChild(link);
+        chatDiv.appendChild(p);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
       };
       reader.readAsArrayBuffer(file);
       fileInput.value = "";
@@ -206,19 +199,15 @@
 
     clearChatBtn.onclick = () => {
       clearChatLocal();
-      for (let id in connections) {
-        try {
-          connections[id].send({ type: "clearChat" });
-        } catch (e) {}
+      for (const id in connections) {
+        connections[id].send({ type: "clearChat" });
       }
       addMessage("🗑 Administrador borró el chat.");
     };
 
     panicBtn.onclick = () => {
-      for (let id in connections) {
-        try {
-          connections[id].send({ type: "panic" });
-        } catch (e) {}
+      for (const id in connections) {
+        connections[id].send({ type: "panic" });
       }
       activatePanic();
     };
