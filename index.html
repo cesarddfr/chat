@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Chat P2P + Compartir Pantalla</title>
   <style>
-    body { font-family: sans-serif; background: #f5f5f5; margin: 0; padding: 10px; }
+    body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
     #chat { border: 1px solid #ccc; background: #fff; height: 250px; overflow-y: auto; margin-bottom: 8px; padding: 5px; }
-    input, button { padding: 6px; margin: 3px; }
-    #friends, #devControls { margin-bottom: 10px; }
-    .friend-button, .kick-button { margin: 2px; }
+    input, button { padding: 5px; margin: 3px; }
+    #friends { margin-bottom: 10px; }
     video { width: 300px; margin-top: 10px; border: 1px solid #333; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
@@ -18,7 +18,7 @@
   <div id="userInfo"></div>
 
   <div id="friends">
-    <input type="text" id="friendName" placeholder="Nombre del amigo">
+    <input type="text" id="friendName" placeholder="Nombre del amigo" />
     <button id="addFriendBtn">Añadir amigo</button>
   </div>
 
@@ -26,47 +26,41 @@
 
   <div id="chat"></div>
 
-  <input type="text" id="messageInput" placeholder="Mensaje">
+  <input type="text" id="messageInput" placeholder="Mensaje" />
   <button id="sendBtn">Enviar</button>
 
-  <br>
-  <button id="shareScreenBtn">Compartir pantalla</button>
-  <button id="devModeBtn">Modo desarrollador</button>
-
-  <div id="devControls" style="display:none;">
-    <button id="clearChatBtn">Borrar chat</button>
-    <button id="panicBtn" style="background: red; color: white;">🚨 Botón del pánico</button>
+  <div id="devControls" class="hidden">
+    <button id="clearChatBtn">Borrar conversación (para todos)</button>
+    <button id="panicBtn">⚠️ Botón del pánico</button>
   </div>
 
+  <br />
+  <button id="shareScreenBtn">Compartir pantalla</button>
   <video id="remoteVideo" autoplay muted></video>
+
+  <br /><br />
+  <button id="devModeBtn">Modo desarrollador</button>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    // ------------------ CONFIGURACIÓN ------------------
-    const PASSWORD = "admin123";
-    const PANIC_URL = "https://classroom.google.com";
-
+    const PASSWORD = "1234";
     const userName = prompt("Pon tu nombre (único para este chat):") || ("user" + Math.floor(Math.random() * 1000));
     const myId = `chat-${userName}`;
     document.getElementById("userInfo").textContent = `Tu nombre: ${userName} (ID: ${myId})`;
 
     const peer = new Peer(myId);
-    const connections = {};
+    let connections = {};
 
     const chatDiv = document.getElementById("chat");
-    const friendList = document.getElementById("friendList");
     const messageInput = document.getElementById("messageInput");
     const sendBtn = document.getElementById("sendBtn");
-    const addFriendBtn = document.getElementById("addFriendBtn");
-    const friendNameInput = document.getElementById("friendName");
-    const devModeBtn = document.getElementById("devModeBtn");
-    const devControls = document.getElementById("devControls");
+    const friendList = document.getElementById("friendList");
+
     const clearChatBtn = document.getElementById("clearChatBtn");
     const panicBtn = document.getElementById("panicBtn");
-    const shareScreenBtn = document.getElementById("shareScreenBtn");
-    const remoteVideo = document.getElementById("remoteVideo");
+    const devControls = document.getElementById("devControls");
+    const devModeBtn = document.getElementById("devModeBtn");
 
-    // ------------------ FUNCIONES GENERALES ------------------
     function addMessage(msg) {
       const p = document.createElement("p");
       p.textContent = msg;
@@ -74,161 +68,199 @@
       chatDiv.scrollTop = chatDiv.scrollHeight;
     }
 
-    function broadcastTypeMessage(type, payload = {}) {
-      for (const id in connections) {
-        connections[id].send({ type, ...payload });
-      }
-    }
-
     function clearChatLocal() {
       chatDiv.innerHTML = "";
     }
 
     function activatePanic() {
-      window.location.replace(PANIC_URL);
+      const destination = "https://classroom.google.com/";
+
+      // Insertar múltiples entradas en el historial para bloquear botón atrás
+      for (let i = 0; i < 10; i++) {
+        history.pushState(null, "", destination);
+      }
+
+      // Redirigir a Classroom reemplazando la página actual
+      window.location.replace(destination);
     }
 
     function addFriendControl(friendId) {
-      const name = friendId.replace(/^chat-/, "");
-      if (document.getElementById(`friend-${friendId}`)) return; // Ya agregado
+      const container = document.createElement("div");
+      container.id = `friend-${friendId}`;
+      container.style.marginBottom = "5px";
 
-      const div = document.createElement("div");
-      div.id = `friend-${friendId}`;
-
-      const connectBtn = document.createElement("button");
-      connectBtn.textContent = `Conectado a ${name}`;
-      connectBtn.disabled = true;
-      connectBtn.classList.add("friend-button");
-      div.appendChild(connectBtn);
+      const label = document.createElement("span");
+      label.textContent = `Conectado con ${friendId.replace("chat-", "")} `;
 
       const kickBtn = document.createElement("button");
-      kickBtn.textContent = `Expulsar a ${name}`;
-      kickBtn.classList.add("kick-button");
+      kickBtn.textContent = "Expulsar";
+      kickBtn.classList.add("hidden");
       kickBtn.onclick = () => {
-        if (confirm(`¿Expulsar a ${name}?`)) {
-          connections[friendId].send({ type: "expulsion" });
-          connections[friendId].close();
-          delete connections[friendId];
-          document.getElementById(`friend-${friendId}`)?.remove();
-          addMessage(`🚫 ${name} ha sido expulsado.`);
+        if (confirm(`¿Seguro que quieres expulsar a ${friendId.replace("chat-", "")}?`)) {
+          if (connections[friendId]) {
+            try {
+              connections[friendId].send({ type: "expulsion" });
+            } catch (e) {}
+            connections[friendId].close();
+            delete connections[friendId];
+            addMessage(`⚠️ Has expulsado a ${friendId.replace("chat-", "")}`);
+            container.remove();
+          }
         }
       };
-      div.appendChild(kickBtn);
 
-      friendList.appendChild(div);
+      container.appendChild(label);
+      container.appendChild(kickBtn);
+      friendList.appendChild(container);
+
+      if (!devControls.classList.contains("hidden")) kickBtn.classList.remove("hidden");
     }
 
-    function handleData(conn, data) {
-      if (data.type === "expulsion") {
-        conn.close();
-        addMessage("❌ Has sido expulsado de la conversación.");
-      } else if (data.type === "clearChat") {
-        clearChatLocal();
-        addMessage("🗑 Administrador borró el chat.");
-      } else if (data.type === "panic") {
-        activatePanic();
-      } else if (data.name && data.text) {
-        addMessage(`${data.name}: ${data.text}`);
-      }
-    }
-
-    // ------------------ EVENTOS DE PEER ------------------
     peer.on("connection", conn => {
-      const friendId = conn.peer;
-      connections[friendId] = conn;
+      connections[conn.peer] = conn;
+      addFriendControl(conn.peer);
 
-      addFriendControl(friendId);
-      addMessage(`🔔 ${friendId.replace(/^chat-/, "")} se ha conectado.`);
-
-      conn.on("data", data => handleData(conn, data));
-      conn.on("close", () => {
-        addMessage(`🚪 ${friendId.replace(/^chat-/, "")} se ha desconectado.`);
-        delete connections[friendId];
-        document.getElementById(`friend-${friendId}`)?.remove();
+      conn.on("data", data => {
+        if (data.type === "expulsion") {
+          conn.close();
+          addMessage("❌ Has sido expulsado de la conversación.");
+          return;
+        }
+        if (data.type === "clearChat") {
+          clearChatLocal();
+          addMessage("🗑 Administrador borró el chat.");
+          return;
+        }
+        if (data.type === "panic") {
+          activatePanic();
+          return;
+        }
+        if (data.name && data.text) addMessage(`${data.name}: ${data.text}`);
       });
+
+      conn.on("close", () => {
+        delete connections[conn.peer];
+        const el = document.getElementById(`friend-${conn.peer}`);
+        if (el) el.remove();
+        addMessage(`❌ ${conn.peer.replace("chat-", "")} se ha desconectado.`);
+      });
+
+      addMessage(`🔔 Conectado con ${conn.peer.replace("chat-", "")}`);
     });
+
+    document.getElementById("addFriendBtn").onclick = () => {
+      const friendName = document.getElementById("friendName").value.trim();
+      if (!friendName) return;
+      const friendId = `chat-${friendName}`;
+
+      const conn = peer.connect(friendId);
+      conn.on("open", () => {
+        connections[friendId] = conn;
+        addFriendControl(friendId);
+
+        conn.on("data", data => {
+          if (data.type === "expulsion") {
+            conn.close();
+            addMessage("❌ Has sido expulsado de la conversación.");
+            return;
+          }
+          if (data.type === "clearChat") {
+            clearChatLocal();
+            addMessage("🗑 Administrador borró el chat.");
+            return;
+          }
+          if (data.type === "panic") {
+            activatePanic();
+            return;
+          }
+          if (data.name && data.text) addMessage(`${data.name}: ${data.text}`);
+        });
+
+        conn.on("close", () => {
+          delete connections[friendId];
+          const el = document.getElementById(`friend-${friendId}`);
+          if (el) el.remove();
+          addMessage(`❌ ${friendName} se ha desconectado.`);
+        });
+
+        addMessage(`✅ Conectado con ${friendName}`);
+      });
+
+      document.getElementById("friendName").value = "";
+    };
+
+    sendBtn.onclick = () => {
+      const msg = messageInput.value.trim();
+      if (!msg) return;
+      for (let id in connections) {
+        connections[id].send({ name: userName, text: msg });
+      }
+      addMessage(`Tú: ${msg}`);
+      messageInput.value = "";
+    };
+
+    messageInput.addEventListener("keypress", e => {
+      if (e.key === "Enter") sendBtn.click();
+    });
+
+    const shareScreenBtn = document.getElementById("shareScreenBtn");
+    const remoteVideo = document.getElementById("remoteVideo");
+
+    shareScreenBtn.onclick = async () => {
+      if (Object.keys(connections).length === 0) return alert("Conéctate con alguien primero");
+      try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        for (const friendId of Object.keys(connections)) {
+          const call = peer.call(friendId, screenStream);
+          call.on("error", (err) => console.error("Error en la llamada", err));
+        }
+
+        screenStream.getVideoTracks()[0].addEventListener("ended", () => {
+          alert("Has dejado de compartir la pantalla.");
+        });
+      } catch (err) {
+        alert("Error al compartir pantalla: " + err.message);
+      }
+    };
 
     peer.on("call", call => {
       call.answer();
-      call.on("stream", stream => {
-        remoteVideo.srcObject = stream;
+      call.on("stream", remoteStream => {
+        remoteVideo.srcObject = remoteStream;
       });
       call.on("close", () => {
         remoteVideo.srcObject = null;
       });
     });
 
-    // ------------------ FUNCIONALIDAD CHAT ------------------
-    sendBtn.onclick = () => {
-      const text = messageInput.value.trim();
-      if (!text) return;
-      addMessage(`Tú: ${text}`);
-      broadcastTypeMessage(null, { name: userName, text });
-      messageInput.value = "";
-    };
-    messageInput.addEventListener("keydown", e => e.key === "Enter" && sendBtn.click());
-
-    // ------------------ FUNCIONALIDAD DESARROLLADOR ------------------
-    devModeBtn.onclick = () => {
-      const input = prompt("Contraseña de administrador:");
-      if (input === PASSWORD) {
-        devControls.style.display = devControls.style.display === "block" ? "none" : "block";
-      } else {
-        alert("❌ Contraseña incorrecta.");
-      }
-    };
-
     clearChatBtn.onclick = () => {
-      broadcastTypeMessage("clearChat");
       clearChatLocal();
-      addMessage("🗑 Chat borrado por el administrador.");
+      for (let id in connections) {
+        try {
+          connections[id].send({ type: "clearChat" });
+        } catch (e) {}
+      }
+      addMessage("🗑 Administrador borró el chat.");
     };
 
     panicBtn.onclick = () => {
-      if (confirm("¿Seguro que quieres activar el pánico? Esta acción redirigirá a todos a Classroom.")) {
-        broadcastTypeMessage("panic");
-        activatePanic();
+      for (let id in connections) {
+        try {
+          connections[id].send({ type: "panic" });
+        } catch (e) {}
       }
+      activatePanic();
     };
 
-    // ------------------ GESTIÓN DE AMIGOS ------------------
-    addFriendBtn.onclick = () => {
-      const friendName = friendNameInput.value.trim();
-      if (!friendName) return;
-      const friendId = `chat-${friendName}`;
-      if (friendId === myId) return alert("❗ No puedes agregarte a ti mismo.");
-
-      const conn = peer.connect(friendId);
-      connections[friendId] = conn;
-
-      conn.on("open", () => {
-        addFriendControl(friendId);
-        addMessage(`✅ Conectado con ${friendName}`);
-      });
-      conn.on("data", data => handleData(conn, data));
-      conn.on("close", () => {
-        addMessage(`🚪 ${friendName} se ha desconectado.`);
-        delete connections[friendId];
-        document.getElementById(`friend-${friendId}`)?.remove();
-      });
-
-      friendNameInput.value = "";
-    };
-
-    // ------------------ COMPARTIR PANTALLA ------------------
-    shareScreenBtn.onclick = async () => {
-      if (Object.keys(connections).length === 0) return alert("Conéctate con alguien primero.");
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        for (const id in connections) {
-          const call = peer.call(id, stream);
-          call.on("error", err => console.error("Error en la llamada:", err));
-        }
-        stream.getVideoTracks()[0].addEventListener("ended", () => {
-          alert("Has dejado de compartir pantalla.");
-        });
-      } catch (err) {
-        alert("Error al compartir pantalla: " + err.message);
+    devModeBtn.onclick = () => {
+      const pwd = prompt("Introduce la contraseña:");
+      if (pwd === PASSWORD) {
+        devControls.classList.remove("hidden");
+        // Mostrar botón expulsar en cada amigo
+        document.querySelectorAll("#friendList div button").forEach(btn => btn.classList.remove("hidden"));
+        addMessage("🔑 Modo desarrollador activado.");
+      } else {
+        alert("❌ Contraseña incorrecta");
       }
     };
   </script>
