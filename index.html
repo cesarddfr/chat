@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Chat P2P + Compartir Pantalla</title>
+  <title>Chat P2P + Envío de Archivos</title>
   <style>
     body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
     #chat { border: 1px solid #ccc; background: #fff; height: 250px; overflow-y: auto; margin-bottom: 8px; padding: 5px; }
@@ -13,7 +13,7 @@
   </style>
 </head>
 <body>
-  <h2>Chat P2P + Compartir Pantalla</h2>
+  <h2>Chat P2P + Envío de Archivos</h2>
 
   <div id="userInfo"></div>
 
@@ -35,8 +35,8 @@
   </div>
 
   <br>
-  <button id="shareScreenBtn">Compartir pantalla</button>
-  <video id="remoteVideo" autoplay muted></video>
+  <input type="file" id="fileInput" class="hidden">
+  <button id="sendFileBtn">Enviar archivo</button>
 
   <br><br>
   <button id="devModeBtn">Modo desarrollador</button>
@@ -55,15 +55,17 @@
     const messageInput = document.getElementById("messageInput");
     const sendBtn = document.getElementById("sendBtn");
     const friendList = document.getElementById("friendList");
-
     const clearChatBtn = document.getElementById("clearChatBtn");
     const panicBtn = document.getElementById("panicBtn");
     const devControls = document.getElementById("devControls");
     const devModeBtn = document.getElementById("devModeBtn");
+    const fileInput = document.getElementById("fileInput");
+    const sendFileBtn = document.getElementById("sendFileBtn");
 
-    function addMessage(msg) {
+    function addMessage(msg, isHtml = false) {
       const p = document.createElement("p");
-      p.textContent = msg;
+      if (isHtml) p.innerHTML = msg;
+      else p.textContent = msg;
       chatDiv.appendChild(p);
       chatDiv.scrollTop = chatDiv.scrollHeight;
     }
@@ -112,7 +114,7 @@
       if (!devControls.classList.contains("hidden")) kickBtn.classList.remove("hidden");
     }
 
-    peer.on("connection", conn => {
+    function setupConnection(conn) {
       connections[conn.peer] = conn;
       addFriendControl(conn.peer);
 
@@ -131,7 +133,15 @@
           activatePanic();
           return;
         }
-        if (data.name && data.text) addMessage(`${data.name}: ${data.text}`);
+        if (data.type === "file") {
+          const blob = new Blob([data.fileData]);
+          const url = URL.createObjectURL(blob);
+          addMessage(`${data.name} envió un archivo: <a href="${url}" download="${data.fileName}">${data.fileName}</a>`, true);
+          return;
+        }
+        if (data.name && data.text) {
+          addMessage(`${data.name}: ${data.text}`);
+        }
       });
 
       conn.on("close", () => {
@@ -142,46 +152,16 @@
       });
 
       addMessage(`🔔 Conectado con ${conn.peer.replace("chat-", "")}`);
-    });
+    }
+
+    peer.on("connection", conn => setupConnection(conn));
 
     document.getElementById("addFriendBtn").onclick = () => {
       const friendName = document.getElementById("friendName").value.trim();
       if (!friendName) return;
       const friendId = `chat-${friendName}`;
-
       const conn = peer.connect(friendId);
-      conn.on("open", () => {
-        connections[friendId] = conn;
-        addFriendControl(friendId);
-
-        conn.on("data", data => {
-          if (data.type === "expulsion") {
-            conn.close();
-            addMessage("❌ Has sido expulsado de la conversación.");
-            return;
-          }
-          if (data.type === "clearChat") {
-            clearChatLocal();
-            addMessage("🗑 Administrador borró el chat.");
-            return;
-          }
-          if (data.type === "panic") {
-            activatePanic();
-            return;
-          }
-          if (data.name && data.text) addMessage(`${data.name}: ${data.text}`);
-        });
-
-        conn.on("close", () => {
-          delete connections[friendId];
-          const el = document.getElementById(`friend-${friendId}`);
-          if (el) el.remove();
-          addMessage(`❌ ${friendName} se ha desconectado.`);
-        });
-
-        addMessage(`✅ Conectado con ${friendName}`);
-      });
-
+      conn.on("open", () => setupConnection(conn));
       document.getElementById("friendName").value = "";
     };
 
@@ -199,35 +179,30 @@
       if (e.key === "Enter") sendBtn.click();
     });
 
-    const shareScreenBtn = document.getElementById("shareScreenBtn");
-    const remoteVideo = document.getElementById("remoteVideo");
-
-    shareScreenBtn.onclick = async () => {
+    sendFileBtn.onclick = () => {
       if (Object.keys(connections).length === 0) return alert("Conéctate con alguien primero");
-      try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        for (const friendId of Object.keys(connections)) {
-          const call = peer.call(friendId, screenStream);
-          call.on("error", (err) => console.error("Error en la llamada", err));
-        }
-
-        screenStream.getVideoTracks()[0].addEventListener("ended", () => {
-          alert("Has dejado de compartir la pantalla.");
-        });
-      } catch (err) {
-        alert("Error al compartir pantalla: " + err.message);
-      }
+      fileInput.click();
     };
 
-    peer.on("call", call => {
-      call.answer();
-      call.on("stream", remoteStream => {
-        remoteVideo.srcObject = remoteStream;
-      });
-      call.on("close", () => {
-        remoteVideo.srcObject = null;
-      });
-    });
+    fileInput.onchange = () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const arrayBuffer = reader.result;
+        for (let id in connections) {
+          connections[id].send({
+            type: "file",
+            name: userName,
+            fileName: file.name,
+            fileData: arrayBuffer
+          });
+        }
+        addMessage(`📁 Tú enviaste un archivo: ${file.name}`);
+      };
+      reader.readAsArrayBuffer(file);
+      fileInput.value = "";
+    };
 
     clearChatBtn.onclick = () => {
       clearChatLocal();
