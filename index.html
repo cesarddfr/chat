@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Chat1 P2P + Compartir Pantalla</title>
+  <title>Chat P2P + Compartir Pantalla</title>
   <style>
     body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
     #chat { border: 1px solid #ccc; background: #fff; height: 250px; overflow-y: auto; margin-bottom: 8px; padding: 5px; }
@@ -31,6 +31,7 @@
 
   <div id="devControls" class="hidden">
     <button id="clearChatBtn">Borrar conversación (para todos)</button>
+    <button id="panicBtn">⚠️ Botón del pánico</button>
   </div>
 
   <br>
@@ -42,7 +43,7 @@
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    const PASSWORD = "1234"; // Puedes cambiar la contraseña aquí
+    const PASSWORD = "1234";
     const userName = prompt("Pon tu nombre (único para este chat):") || ("user" + Math.floor(Math.random() * 1000));
     const myId = `chat-${userName}`;
     document.getElementById("userInfo").textContent = `Tu nombre: ${userName} (ID: ${myId})`;
@@ -56,6 +57,7 @@
     const friendList = document.getElementById("friendList");
 
     const clearChatBtn = document.getElementById("clearChatBtn");
+    const panicBtn = document.getElementById("panicBtn");
     const devControls = document.getElementById("devControls");
     const devModeBtn = document.getElementById("devModeBtn");
 
@@ -68,6 +70,14 @@
 
     function clearChatLocal() {
       chatDiv.innerHTML = "";
+    }
+
+    function activatePanic() {
+      document.body.innerHTML = "<h1>🚨 Emergencia. Página cerrada. 🚨</h1>";
+      setTimeout(() => {
+        window.close();
+        window.location.href = "about:blank";
+      }, 1000);
     }
 
     function addFriendControl(friendId) {
@@ -117,6 +127,10 @@
           addMessage("🗑 Administrador borró el chat.");
           return;
         }
+        if (data.type === "panic") {
+          activatePanic();
+          return;
+        }
         if (data.name && data.text) addMessage(`${data.name}: ${data.text}`);
       });
 
@@ -149,6 +163,10 @@
           if (data.type === "clearChat") {
             clearChatLocal();
             addMessage("🗑 Administrador borró el chat.");
+            return;
+          }
+          if (data.type === "panic") {
+            activatePanic();
             return;
           }
           if (data.name && data.text) addMessage(`${data.name}: ${data.text}`);
@@ -219,6 +237,15 @@
         } catch (e) {}
       }
       addMessage("🗑 Administrador borró el chat.");
+    };
+
+    panicBtn.onclick = () => {
+      for (let id in connections) {
+        try {
+          connections[id].send({ type: "panic" });
+        } catch (e) {}
+      }
+      activatePanic();
     };
 
     devModeBtn.onclick = () => {
