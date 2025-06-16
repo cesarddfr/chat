@@ -2,20 +2,23 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Chat P2P + Envío de Archivos + Videollamada Múltiple</title>
+  <title>Chat P2P + Envío de Archivos + Videollamada</title>
   <style>
     body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
     #chat { border: 1px solid #ccc; background: #fff; height: 250px; overflow-y: auto; margin-bottom: 8px; padding: 5px; }
     input, button { padding: 5px; margin: 3px; }
     #friends { margin-bottom: 10px; }
     .hidden { display: none; }
-    video { width: 200px; height: 150px; background: black; margin: 5px; border: 2px solid gray; }
+    video { width: 200px; height: 150px; background: black; margin: 5px; position: relative; }
     #videos { margin-top: 10px; display: flex; flex-wrap: wrap; }
-    #localVideo { border-color: green; }
+    .video-container { position: relative; display: inline-block; }
+    .video-label { position: absolute; top: 3px; left: 5px; background: rgba(0,0,0,0.5); color: #fff; padding: 2px 5px; font-size: 12px; border-radius: 3px; }
+    #localVideo { border: 2px solid green; }
+    video.remote { border: 2px solid blue; }
   </style>
 </head>
 <body>
-  <h2>Chat P2P + Envío de Archivos + Videollamada Múltiple</h2>
+  <h2>Chat P2P + Envío de Archivos + Videollamada</h2>
 
   <div id="userInfo"></div>
 
@@ -37,20 +40,36 @@
   <div id="devControls" class="hidden">
     <button id="clearChatBtn">🗑 Borrar conversación (para todos)</button>
     <button id="panicBtn">⚠️ Botón del pánico</button>
+    <button id="groupCallBtn">📞 Videollamada grupal</button>
   </div>
 
   <br />
-  <button id="devModeBtn">Modo desarrollador</button>
+  <button id="devModeBtn">Modo Admin</button>
 
   <hr />
 
-  <h3>Videollamada (5 participantes)</h3>
+  <h3>Videollamada</h3>
   <div id="videos">
-    <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo1" autoplay></video>
-    <video id="remoteVideo2" autoplay></video>
-    <video id="remoteVideo3" autoplay></video>
-    <video id="remoteVideo4" autoplay></video>
+    <div class="video-container">
+      <video id="localVideo" autoplay muted></video>
+      <div class="video-label" id="label-local">Tú</div>
+    </div>
+    <div class="video-container">
+      <video class="remote" id="remoteVideo1" autoplay></video>
+      <div class="video-label" id="label-remote1"></div>
+    </div>
+    <div class="video-container">
+      <video class="remote" id="remoteVideo2" autoplay></video>
+      <div class="video-label" id="label-remote2"></div>
+    </div>
+    <div class="video-container">
+      <video class="remote" id="remoteVideo3" autoplay></video>
+      <div class="video-label" id="label-remote3"></div>
+    </div>
+    <div class="video-container">
+      <video class="remote" id="remoteVideo4" autoplay></video>
+      <div class="video-label" id="label-remote4"></div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -63,13 +82,7 @@
     const peer = new Peer(myId);
     const connections = {};
     let localStream = null;
-    const calls = {};
-    const remoteVideoElements = [
-      document.getElementById("remoteVideo1"),
-      document.getElementById("remoteVideo2"),
-      document.getElementById("remoteVideo3"),
-      document.getElementById("remoteVideo4"),
-    ];
+    let currentCalls = [];
 
     const chatDiv = document.getElementById("chat");
     const messageInput = document.getElementById("messageInput");
@@ -82,8 +95,22 @@
     const panicBtn = document.getElementById("panicBtn");
     const devControls = document.getElementById("devControls");
     const devModeBtn = document.getElementById("devModeBtn");
+    const groupCallBtn = document.getElementById("groupCallBtn");
 
     const localVideo = document.getElementById("localVideo");
+    const remoteVideos = [
+      document.getElementById("remoteVideo1"),
+      document.getElementById("remoteVideo2"),
+      document.getElementById("remoteVideo3"),
+      document.getElementById("remoteVideo4")
+    ];
+
+    const remoteLabels = [
+      document.getElementById("label-remote1"),
+      document.getElementById("label-remote2"),
+      document.getElementById("label-remote3"),
+      document.getElementById("label-remote4")
+    ];
 
     function addMessage(msg) {
       const p = document.createElement("p");
@@ -144,7 +171,7 @@
           addMessage("❌ Has sido expulsado de la conversación.");
         } else if (data.type === "clearChat") {
           clearChatLocal();
-          addMessage("🗑 Administrador borró el chat.");
+          addMessage("🗑 Admin borró el chat.");
         } else if (data.type === "panic") {
           activatePanic();
         } else if (data.type === "file") {
@@ -156,6 +183,8 @@
           p.appendChild(link);
           chatDiv.appendChild(p);
           chatDiv.scrollTop = chatDiv.scrollHeight;
+        } else if (data.type === "groupCall") {
+          startCall(conn.peer);
         } else if (data.name && data.text) {
           addMessage(`${data.name}: ${data.text}`);
         }
@@ -182,27 +211,25 @@
           return;
         }
       }
-      if (calls[friendId]) calls[friendId].close();
 
       const call = peer.call(friendId, localStream);
-      calls[friendId] = call;
+      currentCalls.push(call);
 
       call.on("stream", remoteStream => {
-        const emptySlot = remoteVideoElements.find(video => !video.srcObject);
-        if (emptySlot) {
-          emptySlot.srcObject = remoteStream;
-        } else {
-          console.warn("No hay más huecos disponibles para mostrar el video remoto.");
+        const freeIndex = remoteVideos.findIndex(v => v.srcObject === null);
+        if (freeIndex !== -1) {
+          remoteVideos[freeIndex].srcObject = remoteStream;
+          remoteLabels[freeIndex].textContent = friendId.replace("chat-", "");
         }
       });
 
       call.on("close", () => {
-        for (const video of remoteVideoElements) {
-          if (video.srcObject === call.remoteStream) {
+        remoteVideos.forEach((video, i) => {
+          if (remoteLabels[i].textContent === friendId.replace("chat-", "")) {
             video.srcObject = null;
-            break;
+            remoteLabels[i].textContent = "";
           }
-        }
+        });
         addMessage("📴 La videollamada terminó.");
       });
 
@@ -222,24 +249,23 @@
       }
 
       call.answer(localStream);
-      calls[call.peer] = call;
+      currentCalls.push(call);
 
       call.on("stream", remoteStream => {
-        const emptySlot = remoteVideoElements.find(video => !video.srcObject);
-        if (emptySlot) {
-          emptySlot.srcObject = remoteStream;
-        } else {
-          console.warn("No hay más huecos disponibles para mostrar el video remoto.");
+        const freeIndex = remoteVideos.findIndex(v => v.srcObject === null);
+        if (freeIndex !== -1) {
+          remoteVideos[freeIndex].srcObject = remoteStream;
+          remoteLabels[freeIndex].textContent = call.peer.replace("chat-", "");
         }
       });
 
       call.on("close", () => {
-        for (const video of remoteVideoElements) {
-          if (video.srcObject === call.remoteStream) {
+        remoteVideos.forEach((video, i) => {
+          if (remoteLabels[i].textContent === call.peer.replace("chat-", "")) {
             video.srcObject = null;
-            break;
+            remoteLabels[i].textContent = "";
           }
-        }
+        });
         addMessage("📴 La videollamada terminó.");
       });
 
@@ -250,7 +276,6 @@
       const friendName = document.getElementById("friendName").value.trim();
       if (!friendName) return;
       const friendId = `chat-${friendName}`;
-
       const conn = peer.connect(friendId);
       conn.on("open", () => setupConnection(conn));
       document.getElementById("friendName").value = "";
@@ -275,7 +300,6 @@
     fileInput.onchange = () => {
       const file = fileInput.files[0];
       if (!file) return;
-
       const reader = new FileReader();
       reader.onload = () => {
         const blob = new Blob([reader.result]);
@@ -303,7 +327,7 @@
       for (const id in connections) {
         connections[id].send({ type: "clearChat" });
       }
-      addMessage("🗑 Administrador borró el chat.");
+      addMessage("🗑 Admin borró el chat.");
     };
 
     panicBtn.onclick = () => {
@@ -318,10 +342,18 @@
       if (pwd === PASSWORD) {
         devControls.classList.remove("hidden");
         document.querySelectorAll("#friendList button").forEach(btn => btn.classList.remove("hidden"));
-        addMessage("🔑 Modo desarrollador activado.");
+        addMessage("🔑 Modo Admin activado.");
       } else {
         alert("❌ Contraseña incorrecta");
       }
+    };
+
+    groupCallBtn.onclick = () => {
+      for (const id in connections) {
+        connections[id].send({ type: "groupCall" });
+        startCall(id);
+      }
+      addMessage("📞 Videollamada grupal iniciada.");
     };
 
   </script>
