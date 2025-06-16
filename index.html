@@ -2,21 +2,20 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Chat P2P + Envío de Archivos + Videollamada</title>
+  <title>Chat P2P + Envío de Archivos + Videollamada Múltiple</title>
   <style>
     body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
     #chat { border: 1px solid #ccc; background: #fff; height: 250px; overflow-y: auto; margin-bottom: 8px; padding: 5px; }
     input, button { padding: 5px; margin: 3px; }
     #friends { margin-bottom: 10px; }
     .hidden { display: none; }
-    video { width: 200px; height: 150px; background: black; margin: 5px; }
-    #videos { margin-top: 10px; }
-    #localVideo { border: 2px solid green; }
-    #remoteVideo { border: 2px solid blue; }
+    video { width: 200px; height: 150px; background: black; margin: 5px; border: 2px solid gray; }
+    #videos { margin-top: 10px; display: flex; flex-wrap: wrap; }
+    #localVideo { border-color: green; }
   </style>
 </head>
 <body>
-  <h2>Chat P2P + Envío de Archivos + Videollamada</h2>
+  <h2>Chat P2P + Envío de Archivos + Videollamada Múltiple</h2>
 
   <div id="userInfo"></div>
 
@@ -45,10 +44,13 @@
 
   <hr />
 
-  <h3>Videollamada</h3>
+  <h3>Videollamada (5 participantes)</h3>
   <div id="videos">
     <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video>
+    <video id="remoteVideo1" autoplay></video>
+    <video id="remoteVideo2" autoplay></video>
+    <video id="remoteVideo3" autoplay></video>
+    <video id="remoteVideo4" autoplay></video>
   </div>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -61,9 +63,14 @@
     const peer = new Peer(myId);
     const connections = {};
     let localStream = null;
-    let currentCall = null;
+    const calls = {};
+    const remoteVideoElements = [
+      document.getElementById("remoteVideo1"),
+      document.getElementById("remoteVideo2"),
+      document.getElementById("remoteVideo3"),
+      document.getElementById("remoteVideo4"),
+    ];
 
-    // Elementos UI
     const chatDiv = document.getElementById("chat");
     const messageInput = document.getElementById("messageInput");
     const sendBtn = document.getElementById("sendBtn");
@@ -77,9 +84,7 @@
     const devModeBtn = document.getElementById("devModeBtn");
 
     const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
 
-    // Función para mostrar mensajes
     function addMessage(msg) {
       const p = document.createElement("p");
       p.textContent = msg;
@@ -87,20 +92,15 @@
       chatDiv.scrollTop = chatDiv.scrollHeight;
     }
 
-    // Limpiar chat local
     function clearChatLocal() {
       chatDiv.innerHTML = "";
     }
 
-    // Botón de pánico
     function activatePanic() {
       document.body.innerHTML = "<h1>🚨 Emergencia. Página cerrada. 🚨</h1>";
-      setTimeout(() => {
-        location.href = "https://classroom.google.com";
-      }, 800);
+      setTimeout(() => location.href = "https://classroom.google.com", 800);
     }
 
-    // Añadir control de amigo con botón para videollamada y expulsar
     function addFriendControl(friendId) {
       const container = document.createElement("div");
       container.id = `friend-${friendId}`;
@@ -134,7 +134,6 @@
       if (!devControls.classList.contains("hidden")) kickBtn.classList.remove("hidden");
     }
 
-    // Configurar conexión data para chat y control
     function setupConnection(conn) {
       connections[conn.peer] = conn;
       addFriendControl(conn.peer);
@@ -173,7 +172,6 @@
 
     peer.on("connection", setupConnection);
 
-    // Función para iniciar llamada de video
     async function startCall(friendId) {
       if (!localStream) {
         try {
@@ -184,23 +182,33 @@
           return;
         }
       }
-      if (currentCall) {
-        currentCall.close();
-        currentCall = null;
-      }
+      if (calls[friendId]) calls[friendId].close();
+
       const call = peer.call(friendId, localStream);
-      currentCall = call;
+      calls[friendId] = call;
+
       call.on("stream", remoteStream => {
-        remoteVideo.srcObject = remoteStream;
+        const emptySlot = remoteVideoElements.find(video => !video.srcObject);
+        if (emptySlot) {
+          emptySlot.srcObject = remoteStream;
+        } else {
+          console.warn("No hay más huecos disponibles para mostrar el video remoto.");
+        }
       });
+
       call.on("close", () => {
-        remoteVideo.srcObject = null;
+        for (const video of remoteVideoElements) {
+          if (video.srcObject === call.remoteStream) {
+            video.srcObject = null;
+            break;
+          }
+        }
         addMessage("📴 La videollamada terminó.");
       });
+
       addMessage(`📹 Llamando a ${friendId.replace("chat-", "")}...`);
     }
 
-    // Cuando alguien te llama
     peer.on("call", async call => {
       if (!localStream) {
         try {
@@ -212,15 +220,29 @@
           return;
         }
       }
+
       call.answer(localStream);
-      currentCall = call;
+      calls[call.peer] = call;
+
       call.on("stream", remoteStream => {
-        remoteVideo.srcObject = remoteStream;
+        const emptySlot = remoteVideoElements.find(video => !video.srcObject);
+        if (emptySlot) {
+          emptySlot.srcObject = remoteStream;
+        } else {
+          console.warn("No hay más huecos disponibles para mostrar el video remoto.");
+        }
       });
+
       call.on("close", () => {
-        remoteVideo.srcObject = null;
+        for (const video of remoteVideoElements) {
+          if (video.srcObject === call.remoteStream) {
+            video.srcObject = null;
+            break;
+          }
+        }
         addMessage("📴 La videollamada terminó.");
       });
+
       addMessage(`📹 Recibiste una videollamada de ${call.peer.replace("chat-", "")}`);
     });
 
@@ -301,6 +323,7 @@
         alert("❌ Contraseña incorrecta");
       }
     };
+
   </script>
 </body>
 </html>
