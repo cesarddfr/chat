@@ -1,435 +1,958 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Chat P2P + Envío de Archivos + Videollamada</title>
+  <meta charset="utf-8" />
+  <title>Chat P2P - Sidebar de Usuarios + Videollamada Grupal</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
-    #chat { border: 1px solid #ccc; background: #fff; height: 250px; overflow-y: auto; margin-bottom: 8px; padding: 5px; }
-    input, button { padding: 5px; margin: 3px; }
-    #friends { margin-bottom: 10px; }
-    .hidden { display: none; }
-    video { width: 300px; height: 225px; background: black; margin: 5px; position: relative; }
-    #videos { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: flex-start; }
-    .video-container { position: relative; display: inline-block; margin-right: 15px; }
-    .video-label { position: absolute; top: 3px; left: 5px; background: rgba(0,0,0,0.5); color: #fff; padding: 2px 5px; font-size: 12px; border-radius: 3px; }
-    #localVideo { border: 2px solid green; }
-    video.remote { border: 2px solid blue; }
-
-    /* Botón expulsar sobre el video remoto */
-    .kick-btn {
-      position: absolute;
-      top: 5px;
-      right: 5px;
-      background: rgba(255, 0, 0, 0.7);
-      color: white;
-      border: none;
-      padding: 2px 6px;
-      font-size: 12px;
-      border-radius: 3px;
-      cursor: pointer;
-      display: none; /* Se muestra solo si modo admin */
-      z-index: 10;
+    /* Layout general: sidebar izquierda, contenido derecha */
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --accent: #0b84ff;
+      --danger: #ff4d4d;
+      --muted: #6b7280;
+    }
+    html,body { height: 100%; margin: 0; font-family: Inter, system-ui, Arial, sans-serif; background: var(--bg); }
+    .app {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 12px;
+      height: 100vh;
+      padding: 12px;
+      box-sizing: border-box;
     }
 
-    /* Mostrar kick-btn cuando admin activo */
-    .admin .kick-btn {
-      display: block;
+    /* Sidebar */
+    .sidebar {
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 6px 18px rgba(16,24,40,0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: auto;
+    }
+    .sidebar h3 { margin: 0 0 8px 0; font-size: 16px;}
+    .user-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border-radius: 8px;
+      transition: background .12s;
+    }
+    .user-row:hover { background: #f1f5f9; cursor: default; }
+    .user-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg,#7dd3fc,#60a5fa);
+      display:flex;align-items:center;justify-content:center;color:white;font-weight:700;
+    }
+    .user-meta { flex: 1; min-width:0; }
+    .user-name { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .user-id { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .user-actions { display:flex; gap:6px; }
+
+    .btn { padding:6px 8px; border-radius:6px; border: none; background: #eef2ff; cursor: pointer; font-size:13px; }
+    .btn.small { padding:4px 6px; font-size:12px; }
+    .btn.call { background: #e6f7ff; }
+    .btn.chat { background: #f0fdf4; }
+    .btn.kick { background: var(--danger); color: white; }
+    .btn.invite { background: #fff4e6; }
+
+    /* Contenido principal: panel superior info + chat + videos */
+    .main {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .topbar {
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:center;
+    }
+    .panel {
+      background: var(--panel);
+      padding: 12px;
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(16,24,40,0.06);
     }
 
-    /* Botón pánico siempre visible */
-    #panicBtn {
-      background-color: #ff4d4d;
-      color: white;
-      font-weight: bold;
+    /* Chat area */
+    .chat-wrap { display:flex; gap:12px; height: calc(100vh - 260px); } /* reserve space for videos */
+    .chat {
+      flex: 1;
+      display:flex;
+      flex-direction:column;
+      height: 100%;
+    }
+    #messages {
+      flex: 1;
+      overflow:auto;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #edf2f7;
+      background: linear-gradient(180deg,#fff,#fbfdff);
+    }
+    .message { margin: 6px 0; padding:8px 10px; border-radius: 8px; max-width: 70%; }
+    .msg-me { background: #e6f0ff; align-self: flex-end; }
+    .msg-other { background: #f3f4f6; align-self: flex-start; }
+    .message .meta { font-size:11px; color:var(--muted); margin-bottom:4px; }
+
+    .chat-controls { display:flex; gap:8px; margin-top:8px; align-items:center; }
+    input[type="text"], .search-input { padding:8px; border-radius:8px; border:1px solid #e6eef8; flex:1; min-width:0; }
+    input[type="file"] { display:none; }
+
+    /* Videos area */
+    #videos {
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+      padding: 8px;
+      border-radius:8px;
+      border:1px dashed #e6eef8;
+      min-height: 140px;
+      background: linear-gradient(180deg,#fff,#fbfdff);
+    }
+    .video-container {
+      position:relative;
+      width: 260px;
+      height: 190px;
+      border-radius:8px;
+      overflow:hidden;
+      background:black;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow: 0 2px 8px rgba(2,6,23,0.08);
+    }
+    video { width:100%; height:100%; object-fit:cover; background:black; }
+    .video-label {
+      position:absolute;
+      bottom:6px;
+      left:6px;
+      background:rgba(0,0,0,0.5);
+      color:white;
+      font-size:12px;
+      padding:4px 6px;
+      border-radius:6px;
+    }
+    .video-kick {
+      position:absolute;
+      top:6px;
+      right:6px;
+      display:none;
+    }
+    .video-container.admin .video-kick { display:block; }
+
+    /* small screens */
+    @media (max-width:900px) {
+      .app { grid-template-columns: 1fr; grid-auto-rows: auto; }
+      .sidebar { order:2; height:220px; }
+      .main { order:1; }
+      .chat-wrap { height: 420px; }
     }
 
+    /* small helper */
+    .muted { color:var(--muted); font-size:13px; }
   </style>
 </head>
 <body>
-  <h2>Chat P2P + Envío de Archivos + Videollamada</h2>
+  <div class="app">
+    <!-- Sidebar: usuarios conectados -->
+    <aside class="sidebar" id="sidebar">
+      <h3>Personas en la app</h3>
+      <div id="sidebarInfo" class="muted">Buscando peers...</div>
+      <div id="usersList"></div>
 
-  <div id="userInfo"></div>
+      <hr style="margin:8px 0;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="refreshPeersBtn" class="btn small">🔄 Refrescar</button>
+        <button id="toggleAdminBtn" class="btn small">🔑 Modo Admin</button>
+        <button id="panicBtn" class="btn small" style="background:var(--danger);color:white;">⚠️ Pánico</button>
+      </div>
 
-  <div id="friends">
-    <input type="text" id="friendName" placeholder="Nombre del amigo" />
-    <button id="addFriendBtn">Añadir amigo</button>
+      <div style="margin-top:12px; font-size:13px; color:#374151;">
+        <div><strong>Tu nombre:</strong> <span id="userInfoName"></span></div>
+        <div style="margin-top:6px;"><strong>ID Peer:</strong> <span id="userInfoId"></span></div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <div class="topbar">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <h2 style="margin:0;">Chat P2P — Clase</h2>
+          <div class="muted">Chat, archivos, videollamada grupal</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="inviteAllBtn" class="btn small invite">📞 Invitar a videollamada</button>
+          <button id="clearChatBtn" class="btn small">🗑 Borrar chat (admin)</button>
+        </div>
+      </div>
+
+      <div class="panel chat-wrap">
+        <!-- Chat -->
+        <section class="chat" style="flex: 1 1 60%;">
+          <div id="messages" aria-live="polite"></div>
+
+          <div class="chat-controls">
+            <input id="messageInput" type="text" placeholder="Escribe un mensaje..." />
+            <button id="sendBtn" class="btn chat">Enviar</button>
+            <label class="btn small">📁 <input id="fileInput" type="file"></label>
+            <div class="muted" id="connectedCount">Conexiones: 0</div>
+          </div>
+        </section>
+
+        <!-- Videos -->
+        <aside style="width:420px; display:flex; flex-direction:column; gap:8px;">
+          <div class="panel" style="display:flex;flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>Videollamadas</strong>
+              <div class="muted">Activas: <span id="activeCalls">0</span></div>
+            </div>
+            <div id="videos" aria-live="polite">
+              <!-- local video container -->
+              <div class="video-container" id="localVideoContainer">
+                <video id="localVideo" autoplay muted playsinline></video>
+                <div class="video-label" id="label-local">Tú</div>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:8px;">
+              <button id="startLocalCam" class="btn small">Iniciar cámara</button>
+              <button id="stopLocalCam" class="btn small">Detener cámara</button>
+              <button id="leaveAllCalls" class="btn small">Colgar todo</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
   </div>
 
-  <div id="friendList"></div>
-
-  <div id="chat"></div>
-
-  <input type="text" id="messageInput" placeholder="Mensaje" />
-  <button id="sendBtn">Enviar</button>
-
-  <input type="file" id="fileInput" class="hidden" />
-  <button id="sendFileBtn">📁 Enviar archivo</button>
-
-  <!-- Botón del pánico siempre visible fuera del modo admin -->
-  <button id="panicBtn">⚠️ Botón del pánico</button>
-
-  <div id="devControls" class="hidden">
-    <button id="clearChatBtn">🗑 Borrar conversación (para todos)</button>
-    <button id="groupCallBtn">📞 Videollamada grupal</button>
-  </div>
-
-  <br />
-  <button id="devModeBtn">Modo Admin</button>
-
-  <hr />
-
-  <h3>Videollamada</h3>
-  <div id="videos">
-    <div class="video-container" id="localVideoContainer">
-      <video id="localVideo" autoplay muted></video>
-      <div class="video-label" id="label-local">Tú</div>
-    </div>
-    <!-- Solo 1 video remoto visible -->
-    <div class="video-container admin" id="remoteVideoContainer">
-      <video class="remote" id="remoteVideo" autoplay></video>
-      <button class="kick-btn" id="kickBtn">Expulsar</button>
-      <div class="video-label" id="label-remote"></div>
-    </div>
-  </div>
-
+  <!-- PeerJS -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    const PASSWORD = "0011";
-    const userName = prompt("Pon tu nombre (único para este chat):") || ("user" + Math.floor(Math.random() * 1000));
-    const myId = `chat-${userName}`;
-    document.getElementById("userInfo").textContent = `Tu nombre: ${userName} (ID: ${myId})`;
+    /************************************************
+     * Chat P2P con Sidebar de usuarios y videollamada grupal
+     * Autor: generado por asistente (modifica libremente)
+     ************************************************/
 
-    const peer = new Peer(myId);
-    const connections = {};
+    // CONFIG
+    const LOBBY_POLL_INTERVAL = 5000; // ms
+    const PASSWORD = "0011"; // para modo admin (igual que antes)
+
+    // Estado del cliente
+    const userName = prompt("Pon tu nombre (único para esta sesión):") || ("user" + Math.floor(Math.random()*1000));
+    const myId = `chat-${userName}`; // ID predecible (útil)
+    const peer = new Peer(myId); // crea Peer con id fijo
+
+    // Mapa de conexiones de datos (DataConnection): id -> conn
+    const dataConnections = {};
+    // Mapa de llamadas (MediaConnection): id -> call
+    const mediaCalls = {};
+    // Mapa de elementos de video por peerId
+    const remoteVideoElements = {};
+
+    // Streams
     let localStream = null;
-    let currentCall = null;  // Solo 1 llamada a la vez
-    let currentCallPeerId = null;
 
-    const chatDiv = document.getElementById("chat");
-    const messageInput = document.getElementById("messageInput");
-    const sendBtn = document.getElementById("sendBtn");
-    const friendList = document.getElementById("friendList");
-    const fileInput = document.getElementById("fileInput");
-    const sendFileBtn = document.getElementById("sendFileBtn");
+    // UI referencias
+    const usersList = document.getElementById('usersList');
+    const sidebarInfo = document.getElementById('sidebarInfo');
+    const userInfoName = document.getElementById('userInfoName');
+    const userInfoId = document.getElementById('userInfoId');
+    const messagesDiv = document.getElementById('messages');
+    const connectedCount = document.getElementById('connectedCount');
+    const videosDiv = document.getElementById('videos');
+    const localVideo = document.getElementById('localVideo');
+    const labelLocal = document.getElementById('label-local');
 
-    const clearChatBtn = document.getElementById("clearChatBtn");
-    const panicBtn = document.getElementById("panicBtn");
-    const devControls = document.getElementById("devControls");
-    const devModeBtn = document.getElementById("devModeBtn");
-    const groupCallBtn = document.getElementById("groupCallBtn");
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const fileInput = document.getElementById('fileInput');
 
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
-    const remoteLabel = document.getElementById("label-remote");
-    const kickBtn = document.getElementById("kickBtn");
-    const remoteVideoContainer = document.getElementById("remoteVideoContainer");
+    const refreshPeersBtn = document.getElementById('refreshPeersBtn');
+    const toggleAdminBtn = document.getElementById('toggleAdminBtn');
+    const panicBtn = document.getElementById('panicBtn');
+    const inviteAllBtn = document.getElementById('inviteAllBtn');
+    const clearChatBtn = document.getElementById('clearChatBtn');
+    const startLocalCam = document.getElementById('startLocalCam');
+    const stopLocalCam = document.getElementById('stopLocalCam');
+    const leaveAllCalls = document.getElementById('leaveAllCalls');
+    const activeCallsSpan = document.getElementById('activeCalls');
 
+    // Estado UI
     let isAdmin = false;
+    userInfoName.textContent = userName;
+    userInfoId.textContent = myId;
 
-    function addMessage(msg) {
-      const p = document.createElement("p");
-      p.textContent = msg;
-      chatDiv.appendChild(p);
-      chatDiv.scrollTop = chatDiv.scrollHeight;
+    // Mensajería (UI)
+    function addMessage(text, cls = 'msg-other') {
+      const div = document.createElement('div');
+      div.className = `message ${cls}`;
+      const metaSpan = document.createElement('div');
+      metaSpan.className = 'meta';
+      metaSpan.textContent = new Date().toLocaleTimeString();
+      const content = document.createElement('div');
+      content.textContent = text;
+      div.appendChild(metaSpan);
+      div.appendChild(content);
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    function clearChatLocal() {
-      chatDiv.innerHTML = "";
+    // Actualiza contador de conexiones visibles
+    function updateConnectionCount() {
+      connectedCount.textContent = `Conexiones: ${Object.keys(dataConnections).length}`;
+      activeCallsSpan.textContent = String(Object.keys(mediaCalls).length);
     }
 
-    function activatePanic() {
-      document.body.innerHTML = "<h1>🚨 Emergencia. Página cerrada. 🚨</h1>";
-      setTimeout(() => location.href = "https://classroom.google.com", 800);
+    /*********************
+     * Discovery (listAllPeers)
+     * Intenta usar peer.listAllPeers() si el servidor lo permite.
+     * Actualiza sidebar con todos los peers encontrados.
+     *********************/
+    let lastPeersSeen = [];
+
+    async function fetchPeersList() {
+      // peer.listAllPeers may be asynchronous (uses callback); we wrap in Promise
+      if (!peer || !peer.listAllPeers) {
+        sidebarInfo.textContent = 'El servidor PeerJS no soporta listado de peers.';
+        return;
+      }
+      try {
+        const list = await new Promise((resolve, reject) => {
+          peer.listAllPeers(list => {
+            if (Array.isArray(list)) resolve(list);
+            else reject(new Error('No se obtuvo lista'));
+          });
+        });
+        // filter out internal / self
+        const filtered = list.filter(id => id && id.startsWith('chat-') && id !== myId);
+        lastPeersSeen = filtered;
+        sidebarInfo.textContent = `Peers encontrados: ${filtered.length}`;
+        renderSidebar(filtered);
+      } catch (e) {
+        // Puede fallar si el servidor no lo permite -> mostrar aviso
+        sidebarInfo.textContent = 'No se pudo listar peers (servidor puede no permitirlo).';
+        // aun así renderizar conocidos
+        renderSidebar(lastPeersSeen);
+      }
     }
 
-    function addFriendControl(friendId) {
-      const container = document.createElement("div");
-      container.id = `friend-${friendId}`;
-      container.style.marginBottom = "5px";
+    // Renderiza la sidebar con acciones
+    function renderSidebar(peerIds) {
+      usersList.innerHTML = '';
+      // Orden: peers ordenados alfabeticamente
+      const sorted = [...new Set(peerIds)].sort();
+      if (sorted.length === 0) {
+        const p = document.createElement('div');
+        p.className = 'muted';
+        p.textContent = 'No hay peers detectados automáticamente. Puedes invitar a tus compañeros a usar este mismo servidor Peer.';
+        usersList.appendChild(p);
+      }
 
-      const label = document.createElement("span");
-      label.textContent = `Conectado con ${friendId.replace("chat-", "")} `;
+      sorted.forEach(pid => {
+        const row = document.createElement('div');
+        row.className = 'user-row';
+        row.id = `row-${pid}`;
 
-      const callBtn = document.createElement("button");
-      callBtn.textContent = "📹 Videollamada";
-      callBtn.onclick = () => startCall(friendId);
+        const avatar = document.createElement('div');
+        avatar.className = 'user-avatar';
+        // initials
+        avatar.textContent = pid.replace('chat-','').slice(0,2).toUpperCase();
 
-      const kickBtnFriend = document.createElement("button");
-      kickBtnFriend.textContent = "Expulsar";
-      kickBtnFriend.classList.add("hidden");
-      kickBtnFriend.onclick = () => {
-        if (confirm(`¿Seguro que quieres expulsar a ${friendId.replace("chat-", "")}?`)) {
-          connections[friendId]?.send({ type: "expulsion" });
-          connections[friendId]?.close();
-          delete connections[friendId];
-          addMessage(`⚠️ Has expulsado a ${friendId.replace("chat-", "")}`);
-          container.remove();
-          // Si la llamada es con este amigo, cortar llamada
-          if (currentCallPeerId === friendId) {
-            endCurrentCall();
+        const meta = document.createElement('div');
+        meta.className = 'user-meta';
+        const title = document.createElement('div');
+        title.className = 'user-name';
+        title.textContent = pid.replace('chat-','');
+        const sub = document.createElement('div');
+        sub.className = 'user-id';
+        sub.textContent = pid;
+
+        meta.appendChild(title);
+        meta.appendChild(sub);
+
+        const actions = document.createElement('div');
+        actions.className = 'user-actions';
+
+        // Chat button
+        const chatBtn = document.createElement('button');
+        chatBtn.className = 'btn small chat';
+        chatBtn.title = 'Abrir/Conectar chat';
+        chatBtn.innerText = '💬';
+        chatBtn.onclick = () => {
+          // connect if not connected
+          if (!dataConnections[pid]) connectToPeer(pid);
+          else addMessage(`✅ Ya conectado a ${pid.replace('chat-','')}.`, 'msg-other');
+        };
+
+        // Call button
+        const callBtn = document.createElement('button');
+        callBtn.className = 'btn small call';
+        callBtn.title = 'Llamar (1:1)';
+        callBtn.innerText = '📹';
+        callBtn.onclick = async () => {
+          await ensureLocalStream();
+          if (!dataConnections[pid]) {
+            // Make data connection first; then call
+            const conn = connectToPeer(pid);
+            conn.on('open', () => {
+              startCall(pid);
+            });
+          } else {
+            startCall(pid);
           }
+        };
+
+        // Invite to group (sends a 'groupCallInvite' message)
+        const inviteBtn = document.createElement('button');
+        inviteBtn.className = 'btn small';
+        inviteBtn.title = 'Invitar a la llamada grupal';
+        inviteBtn.innerText = '➕';
+        inviteBtn.onclick = () => {
+          if (!dataConnections[pid]) {
+            connectToPeer(pid);
+            // invitation will be sent once connection opens
+            setTimeout(() => {
+              dataConnections[pid]?.send({ type: 'groupInvite', from: myId });
+              addMessage(`📨 Invitación enviada a ${pid.replace('chat-','')}.`, 'msg-me');
+            }, 700);
+          } else {
+            dataConnections[pid].send({ type: 'groupInvite', from: myId });
+            addMessage(`📨 Invitación enviada a ${pid.replace('chat-','')}.`, 'msg-me');
+          }
+        };
+
+        // Kick button (only visible if admin)
+        const kickBtn = document.createElement('button');
+        kickBtn.className = 'btn small kick';
+        kickBtn.title = 'Expulsar (admin)';
+        kickBtn.innerText = '❌';
+        kickBtn.style.display = isAdmin ? 'inline-block' : 'none';
+        kickBtn.onclick = () => {
+          if (!isAdmin) { alert('Solo admins pueden expulsar.'); return; }
+          if (!confirm(`¿Expulsar a ${pid.replace('chat-','')}?`)) return;
+          // send expulsion message and close connection
+          if (dataConnections[pid]) {
+            try { dataConnections[pid].send({ type: 'expulsion', from: myId }); } catch(e){/*noop*/ }
+            dataConnections[pid].close();
+            delete dataConnections[pid];
+          } else {
+            // optimistic: still notify via peer.listAllPeers won't work; show message
+            addMessage(`⚠️ Intentaste expulsar a ${pid.replace('chat-','')}, pero no había conexión directa.`, 'msg-me');
+          }
+          // remove video if present
+          removeRemoteVideo(pid);
+          renderSidebar(lastPeersSeen);
+          updateConnectionCount();
+        };
+
+        actions.appendChild(chatBtn);
+        actions.appendChild(callBtn);
+        actions.appendChild(inviteBtn);
+        actions.appendChild(kickBtn);
+
+        row.appendChild(avatar);
+        row.appendChild(meta);
+        row.appendChild(actions);
+
+        usersList.appendChild(row);
+      });
+
+      // additionally, show peers with which we already have dataConnections but weren't in the list
+      Object.keys(dataConnections).forEach(k => {
+        if (!sorted.includes(k) && k !== myId) {
+          // create mini-row if doesn't exist
+          if (!document.getElementById(`row-${k}`)) {
+            const row = document.createElement('div');
+            row.className = 'user-row';
+            row.id = `row-${k}`;
+            row.innerHTML = `<div class="user-avatar">${k.replace('chat-','').slice(0,2).toUpperCase()}</div>
+              <div class="user-meta"><div class="user-name">${k.replace('chat-','')}</div><div class="user-id">${k}</div></div>
+              <div class="user-actions"><button class="btn small chat">💬</button><button class="btn small call">📹</button></div>`;
+            usersList.appendChild(row);
+          }
+        }
+      });
+
+      updateConnectionCount();
+    }
+
+    // Conectar a un peer por id via DataConnection (PeerJS)
+    function connectToPeer(peerId) {
+      if (peerId === myId) { addMessage("No puedes conectarte a ti mismo."); return null; }
+      if (dataConnections[peerId]) {
+        return dataConnections[peerId];
+      }
+      const conn = peer.connect(peerId, { reliable: true });
+      conn.on('open', () => {
+        console.log('DataConnection open to', peerId);
+        setupDataConnection(conn);
+        // after connecting, announce presence & request peer to share its known peers
+        try { conn.send({ type: 'hello', from: myId, name: userName }); } catch (e) { }
+        // ask for peers list
+        try { conn.send({ type: 'requestPeers', from: myId }); } catch (e) { }
+      });
+      conn.on('error', err => {
+        console.warn('Conn error', peerId, err);
+      });
+      conn.on('close', () => {
+        console.log('Conn closed to', peerId);
+        delete dataConnections[peerId];
+        updateConnectionCount();
+        // remove sidebar row highlight
+        const row = document.getElementById(`row-${peerId}`);
+        if (row) row.style.opacity = '0.6';
+      });
+      return conn;
+    }
+
+    // Setup cuando alguien nos conecta (incoming data conn) o cuando nos conectamos
+    function setupDataConnection(conn) {
+      const pid = conn.peer;
+      dataConnections[pid] = conn;
+      updateConnectionCount();
+
+      // Ensure sidebar shows them
+      if (!lastPeersSeen.includes(pid)) {
+        lastPeersSeen.push(pid);
+        renderSidebar(lastPeersSeen);
+      }
+
+      conn.on('data', async (data) => {
+        // Manejo de mensajes de control y chat
+        if (!data) return;
+        // console.log('Data from', pid, data);
+        if (data.type === 'hello') {
+          addMessage(`🔔 ${data.name || pid.replace('chat-','')} se ha conectado.`, 'msg-other');
+        } else if (data.type === 'text') {
+          addMessage(`${data.name || pid.replace('chat-','')}: ${data.text}`, 'msg-other');
+        } else if (data.type === 'file') {
+          // reconstruct file link (we use blob URLs sent by sender)
+          const link = document.createElement('a');
+          link.href = data.url;
+          link.download = data.fileName;
+          link.textContent = `📎 Archivo: ${data.fileName} (de ${pid.replace('chat-','')})`;
+          const p = document.createElement('div');
+          p.className = 'message msg-other';
+          p.appendChild(link);
+          messagesDiv.appendChild(p);
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        } else if (data.type === 'clearChat') {
+          messagesDiv.innerHTML = '';
+          addMessage('🗑 El chat fue borrado por el admin.', 'msg-other');
+        } else if (data.type === 'panic') {
+          activatePanic();
+        } else if (data.type === 'expulsion') {
+          addMessage('❌ Has sido expulsado del chat por un admin.', 'msg-other');
+          // close all connections and stop streams
+          for (const k in dataConnections) {
+            try { dataConnections[k].close(); } catch(e){}
+            delete dataConnections[k];
+          }
+          if (localStream) {
+            try {
+              localStream.getTracks().forEach(t => t.stop());
+            } catch(e){}
+            localStream = null;
+            localVideo.srcObject = null;
+          }
+        } else if (data.type === 'requestPeers') {
+          // peer nos pide lista de peers conocidos -> respondemos con lastPeersSeen + nosotros
+          const payload = { type: 'peersList', peers: Array.from(new Set([ ...lastPeersSeen, myId ])) };
+          try { conn.send(payload); } catch(e){}
+        } else if (data.type === 'peersList') {
+          // integrarlos a lastPeersSeen y renderizar sidebar
+          const peers = data.peers.filter(p => p !== myId);
+          lastPeersSeen = Array.from(new Set([ ...lastPeersSeen, ...peers ]));
+          renderSidebar(lastPeersSeen);
+        } else if (data.type === 'groupInvite') {
+          addMessage(`📨 Invitación a llamada grupal desde ${data.from.replace('chat-','')}.`, 'msg-other');
+          // auto-accept: startCall to inviter (thus join group)
+          // We ensure we have local stream, then call back the inviter
+          await ensureLocalStream();
+          // start 1:1 call to the inviter (both will add video elements)
+          startCall(data.from);
+        } else if (data.type === 'joinAnnouncement') {
+          // someone announces su presencia (when opens connection)
+          if (!lastPeersSeen.includes(data.id) && data.id !== myId) {
+            lastPeersSeen.push(data.id);
+            renderSidebar(lastPeersSeen);
+          }
+        }
+      });
+    }
+
+    // Cuando recibimos una llamada (peer.on('call'))
+    peer.on('call', async (call) => {
+      console.log('Incoming call from', call.peer);
+      // Asegurarse de tener localStream
+      try {
+        await ensureLocalStream();
+      } catch (e) {
+        alert('No se pudo acceder a cámara/micro para responder la llamada: ' + e);
+        call.close();
+        return;
+      }
+
+      // Responder con nuestro stream
+      try {
+        call.answer(localStream);
+      } catch (e) {
+        console.warn('No se pudo contestar llamada', e);
+        return;
+      }
+
+      // guardar la llamada
+      mediaCalls[call.peer] = call;
+      updateConnectionCount();
+
+      // Cuando recibimos stream remoto
+      call.on('stream', (remoteStream) => {
+        addRemoteVideo(call.peer, remoteStream, call.peer.replace('chat-',''));
+      });
+
+      call.on('close', () => {
+        removeRemoteVideo(call.peer);
+        delete mediaCalls[call.peer];
+        updateConnectionCount();
+        addMessage(`📴 ${call.peer.replace('chat-','')} colgó la llamada.`, 'msg-other');
+      });
+
+      call.on('error', (err) => {
+        console.warn('Call error', err);
+        removeRemoteVideo(call.peer);
+        delete mediaCalls[call.peer];
+        updateConnectionCount();
+      });
+
+      addMessage(`📹 Llamada entrante de ${call.peer.replace('chat-','')}.`, 'msg-other');
+    });
+
+    // Iniciar llamada 1:1 a un peer (o unirse a grupo llamando a cada peer)
+    async function startCall(peerId) {
+      if (!peerId) return;
+      await ensureLocalStream();
+      // If already calling this peer, ignore
+      if (mediaCalls[peerId]) {
+        addMessage(`Ya estás en llamada con ${peerId.replace('chat-','')}.`, 'msg-me');
+        return;
+      }
+      // Initiate call
+      try {
+        const call = peer.call(peerId, localStream);
+        mediaCalls[peerId] = call;
+        updateConnectionCount();
+        call.on('stream', remoteStream => {
+          addRemoteVideo(peerId, remoteStream, peerId.replace('chat-',''));
+        });
+        call.on('close', () => {
+          removeRemoteVideo(peerId);
+          delete mediaCalls[peerId];
+          updateConnectionCount();
+          addMessage(`📴 Llamada con ${peerId.replace('chat-','')} terminó.`, 'msg-other');
+        });
+        call.on('error', (e) => {
+          console.warn('call error', e);
+        });
+        addMessage(`📹 Llamando a ${peerId.replace('chat-','')}...`, 'msg-me');
+      } catch (e) {
+        console.warn('Error initiating call', e);
+        addMessage(`No se pudo iniciar la llamada a ${peerId.replace('chat-','')}.`, 'msg-me');
+      }
+    }
+
+    // Add a remote video element for a peer
+    function addRemoteVideo(peerId, stream, labelText) {
+      // If already exists, update src
+      if (remoteVideoElements[peerId]) {
+        remoteVideoElements[peerId].srcObject = stream;
+        return;
+      }
+      const container = document.createElement('div');
+      container.className = 'video-container';
+      container.id = `video-${peerId}`;
+      if (isAdmin) container.classList.add('admin');
+
+      const vid = document.createElement('video');
+      vid.autoplay = true;
+      vid.playsInline = true;
+      vid.srcObject = stream;
+
+      const label = document.createElement('div');
+      label.className = 'video-label';
+      label.innerText = labelText || peerId.replace('chat-','');
+
+      const kick = document.createElement('button');
+      kick.className = 'btn small video-kick';
+      kick.innerText = 'Expulsar';
+      kick.onclick = () => {
+        if (!isAdmin) { alert('Solo admin puede expulsar.'); return; }
+        if (confirm(`Expulsar a ${peerId.replace('chat-','')} de la videollamada?`)) {
+          // send expulsion over data connection if exists
+          if (dataConnections[peerId]) {
+            try { dataConnections[peerId].send({ type: 'expulsion', from: myId }); } catch(e){}
+            dataConnections[peerId].close();
+            delete dataConnections[peerId];
+          }
+          // close media call if exists
+          if (mediaCalls[peerId]) {
+            try { mediaCalls[peerId].close(); } catch(e){}
+            delete mediaCalls[peerId];
+          }
+          removeRemoteVideo(peerId);
+          addMessage(`⚠️ Expulsado ${peerId.replace('chat-','')} (admin).`, 'msg-me');
         }
       };
 
+      container.appendChild(vid);
       container.appendChild(label);
-      container.appendChild(callBtn);
-      container.appendChild(kickBtnFriend);
-      friendList.appendChild(container);
+      container.appendChild(kick);
 
-      if (isAdmin) kickBtnFriend.classList.remove("hidden");
+      videosDiv.appendChild(container);
+      remoteVideoElements[peerId] = vid;
+      updateConnectionCount();
     }
 
-    function setupConnection(conn) {
-      connections[conn.peer] = conn;
-      addFriendControl(conn.peer);
-
-      conn.on("data", data => {
-        if (data.type === "expulsion") {
-          // Avisar usuario expulsado
-          addMessage("❌ Has sido expulsado de la conversación.");
-          // Cerrar conexiones y llamada si hay
-          if (currentCall) {
-            currentCall.close();
-            currentCall = null;
-            currentCallPeerId = null;
-            remoteVideo.srcObject = null;
-            remoteLabel.textContent = "";
-          }
-          conn.close();
-        } else if (data.type === "clearChat") {
-          clearChatLocal();
-          addMessage("🗑 Admin borró el chat.");
-        } else if (data.type === "panic") {
-          activatePanic();
-        } else if (data.type === "file") {
-          const link = document.createElement("a");
-          link.href = data.url;
-          link.download = data.fileName;
-          link.textContent = `📎 Archivo recibido: ${data.fileName}`;
-          const p = document.createElement("p");
-          p.appendChild(link);
-          chatDiv.appendChild(p);
-          chatDiv.scrollTop = chatDiv.scrollHeight;
-        } else if (data.type === "groupCall") {
-          startCall(conn.peer);
-        } else if (data.name && data.text) {
-          addMessage(`${data.name}: ${data.text}`);
-        }
-      });
-
-      conn.on("close", () => {
-        delete connections[conn.peer];
-        document.getElementById(`friend-${conn.peer}`)?.remove();
-        addMessage(`❌ ${conn.peer.replace("chat-", "")} se ha desconectado.`);
-        // Si la llamada era con este amigo, cortar llamada y limpiar video remoto
-        if (currentCallPeerId === conn.peer) {
-          endCurrentCall();
-        }
-      });
-
-      addMessage(`🔔 Conectado con ${conn.peer.replace("chat-", "")}`);
-    }
-
-    peer.on("connection", setupConnection);
-
-    async function startCall(friendId) {
-      if (!localStream) {
+    // Remove remote video & container
+    function removeRemoteVideo(peerId) {
+      const cont = document.getElementById(`video-${peerId}`);
+      if (cont && cont.parentNode) cont.parentNode.removeChild(cont);
+      if (remoteVideoElements[peerId]) {
         try {
-          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          localVideo.srcObject = localStream;
-        } catch (e) {
-          alert("No se pudo acceder a la cámara o micrófono: " + e);
-          return;
-        }
+          // stop tracks? only remote tracks
+          const s = remoteVideoElements[peerId].srcObject;
+          if (s && s.getTracks) s.getTracks().forEach(t => t.stop());
+        } catch (e) {}
+        delete remoteVideoElements[peerId];
       }
-
-      if (currentCall) {
-        // Cerrar llamada anterior si existe
-        endCurrentCall();
-      }
-
-      const call = peer.call(friendId, localStream);
-      currentCall = call;
-      currentCallPeerId = friendId;
-
-      call.on("stream", remoteStream => {
-        remoteVideo.srcObject = remoteStream;
-        remoteLabel.textContent = friendId.replace("chat-", "");
-      });
-
-      call.on("close", () => {
-        addMessage("📴 La videollamada terminó.");
-        endCurrentCall();
-      });
-
-      addMessage(`📹 Llamando a ${friendId.replace("chat-", "")}...`);
+      updateConnectionCount();
     }
 
-    function endCurrentCall() {
-      if (currentCall) {
-        currentCall.close();
-        currentCall = null;
-        currentCallPeerId = null;
+    // Ensure local camera/mic stream
+    async function ensureLocalStream() {
+      if (localStream) return localStream;
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
+        addMessage('🎥 Cámara activada.', 'msg-me');
+        return localStream;
+      } catch (e) {
+        throw e;
       }
-      remoteVideo.srcObject = null;
-      remoteLabel.textContent = "";
     }
 
-    peer.on("call", async call => {
-      if (!localStream) {
+    // Stop local camera
+    function stopLocalStream() {
+      if (!localStream) return;
+      try {
+        localStream.getTracks().forEach(t => t.stop());
+      } catch (e) {}
+      localStream = null;
+      localVideo.srcObject = null;
+      addMessage('🛑 Cámara detenida.', 'msg-me');
+    }
+
+    // Enviar mensaje de chat a todos los dataConnections
+    function broadcastText(text) {
+      for (const k in dataConnections) {
         try {
-          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          localVideo.srcObject = localStream;
-        } catch (e) {
-          alert("No se pudo acceder a la cámara o micrófono para responder la llamada: " + e);
-          call.close();
-          return;
-        }
+          dataConnections[k].send({ type: 'text', name: userName, text });
+        } catch (e) {}
       }
+      addMessage(`Tú: ${text}`, 'msg-me');
+    }
 
-      // Si hay llamada en curso, cerrarla para aceptar la nueva (solo 1 a la vez)
-      if (currentCall) endCurrentCall();
-
-      call.answer(localStream);
-      currentCall = call;
-      currentCallPeerId = call.peer;
-
-      call.on("stream", remoteStream => {
-        remoteVideo.srcObject = remoteStream;
-        remoteLabel.textContent = call.peer.replace("chat-", "");
-      });
-
-      call.on("close", () => {
-        addMessage("📴 La videollamada terminó.");
-        endCurrentCall();
-      });
-
-      addMessage(`📹 Recibiste una videollamada de ${call.peer.replace("chat-", "")}`);
-    });
-
-    // Expulsar usuario desde el botón arriba del video remoto
-    kickBtn.onclick = () => {
-      if (!isAdmin) {
-        alert("Solo el admin puede expulsar usuarios.");
-        return;
-      }
-      if (!currentCallPeerId) {
-        alert("No hay usuario en la videollamada para expulsar.");
-        return;
-      }
-      if (confirm(`¿Seguro que quieres expulsar a ${currentCallPeerId.replace("chat-", "")}?`)) {
-        connections[currentCallPeerId]?.send({ type: "expulsion" });
-        connections[currentCallPeerId]?.close();
-        delete connections[currentCallPeerId];
-        addMessage(`⚠️ Has expulsado a ${currentCallPeerId.replace("chat-", "")}`);
-        endCurrentCall();
-
-        // También eliminar control de amigo si está visible (opcional)
-        document.getElementById(`friend-${currentCallPeerId}`)?.remove();
-      }
-    };
-
-    document.getElementById("addFriendBtn").onclick = () => {
-      const friendName = document.getElementById("friendName").value.trim();
-      if (!friendName) return;
-      const friendId = `chat-${friendName}`;
-      if (connections[friendId]) {
-        alert("Ya estás conectado con ese amigo.");
-        return;
-      }
-      const conn = peer.connect(friendId);
-      conn.on("open", () => setupConnection(conn));
-      document.getElementById("friendName").value = "";
-    };
-
-    sendBtn.onclick = () => {
-      const msg = messageInput.value.trim();
-      if (!msg) return;
-      for (const id in connections) {
-        connections[id].send({ name: userName, text: msg });
-      }
-      addMessage(`Tú: ${msg}`);
-      messageInput.value = "";
-    };
-
-    messageInput.addEventListener("keypress", e => {
-      if (e.key === "Enter") sendBtn.click();
-    });
-
-    sendFileBtn.onclick = () => fileInput.click();
-
-    fileInput.onchange = () => {
-      const file = fileInput.files[0];
-      if (!file) return;
+    // Enviar archivo (simple: blob URL)
+    function broadcastFile(file) {
       const reader = new FileReader();
       reader.onload = () => {
         const blob = new Blob([reader.result]);
         const url = URL.createObjectURL(blob);
-
-        for (const id in connections) {
-          connections[id].send({ type: "file", fileName: file.name, url });
+        for (const k in dataConnections) {
+          try { dataConnections[k].send({ type: 'file', fileName: file.name, url }); } catch(e){}
         }
-
-        const link = document.createElement("a");
+        const link = document.createElement('a');
         link.href = url;
         link.download = file.name;
         link.textContent = `📎 Tú enviaste: ${file.name}`;
-        const p = document.createElement("p");
+        const p = document.createElement('div');
+        p.className = 'message msg-me';
         p.appendChild(link);
-        chatDiv.appendChild(p);
-        chatDiv.scrollTop = chatDiv.scrollHeight;
+        messagesDiv.appendChild(p);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
       };
       reader.readAsArrayBuffer(file);
-      fileInput.value = "";
-    };
+    }
 
-    clearChatBtn.onclick = () => {
-      clearChatLocal();
-      for (const id in connections) {
-        connections[id].send({ type: "clearChat" });
+    // Panic action: notify everyone and hide page
+    function activatePanic() {
+      for (const k in dataConnections) {
+        try { dataConnections[k].send({ type: 'panic', from: myId }); } catch(e){}
       }
-      addMessage("🗑 Admin borró el chat.");
+      document.body.innerHTML = '<div style="padding:40px;text-align:center;"><h1>🚨 Emergencia. Página cerrada. 🚨</h1></div>';
+      // no redirect here: user can reopen
+    }
+
+    /*****************
+     * Peer events: conexión de datos entrante
+     *****************/
+    peer.on('open', (id) => {
+      console.log('Peer open:', id);
+      sidebarInfo.textContent = 'Conectado al servidor PeerJS.';
+      // intentamos fetch inicial de peers
+      fetchPeersList();
+    });
+
+    // Si otra persona nos conecta (incoming connection)
+    peer.on('connection', (conn) => {
+      console.log('Incoming data connection from', conn.peer);
+      setupDataConnection(conn);
+      conn.on('open', () => {
+        // send our presence
+        try { conn.send({ type: 'hello', from: myId, name: userName }); } catch(e){}
+        try { conn.send({ type: 'joinAnnouncement', id: myId }); } catch(e){}
+      });
+    });
+
+    peer.on('disconnected', () => {
+      console.warn('Peer disconnected. Intentando reconnect...');
+      sidebarInfo.textContent = 'Desconectado del servidor PeerJS.';
+    });
+
+    peer.on('error', (err) => {
+      console.error('Peer error:', err);
+      sidebarInfo.textContent = `Error Peer: ${err}`;
+    });
+
+    /*****************
+     * UI handlers
+     *****************/
+    sendBtn.onclick = () => {
+      const t = messageInput.value.trim();
+      if (!t) return;
+      // broadcast to all
+      broadcastText(t);
+      messageInput.value = '';
+    };
+    messageInput.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') sendBtn.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      broadcastFile(f);
+      fileInput.value = '';
+    });
+
+    refreshPeersBtn.onclick = () => fetchPeersList();
+
+    toggleAdminBtn.onclick = () => {
+      const pwd = prompt('Introduce contraseña admin:');
+      if (pwd === PASSWORD) {
+        isAdmin = true;
+        toggleAdminBtn.textContent = '🔑 Admin ON';
+        // show kick buttons in sidebar & video containers
+        document.querySelectorAll('.btn.kick').forEach(b => b.style.display = 'inline-block');
+        document.querySelectorAll('.video-container').forEach(v => v.classList.add('admin'));
+        addMessage('🔐 Modo Admin activado.', 'msg-me');
+      } else {
+        alert('Contraseña incorrecta.');
+      }
     };
 
     panicBtn.onclick = () => {
-      for (const id in connections) {
-        connections[id].send({ type: "panic" });
-      }
+      if (!confirm('¿Activar botón del pánico? Cerrará esta página localmente y avisará a los peers.')) return;
       activatePanic();
     };
 
-    devModeBtn.onclick = () => {
-      const pwd = prompt("Introduce la contraseña:");
-      if (pwd === PASSWORD) {
-        isAdmin = true;
-        devControls.classList.remove("hidden");
-        document.querySelectorAll("#friendList button").forEach(btn => btn.classList.remove("hidden"));
-        // Mostrar botón expulsar arriba del video remoto
-        remoteVideoContainer.classList.add("admin");
-        addMessage("🔑 Modo Admin activado.");
-      } else {
-        alert("Contraseña incorrecta.");
-      }
+    inviteAllBtn.onclick = async () => {
+      await ensureLocalStream();
+      // For each known peer, call them (join group by calling each)
+      const targets = new Set([...lastPeersSeen, ...Object.keys(dataConnections)]);
+      targets.delete(myId);
+      const arr = Array.from(targets);
+      if (arr.length === 0) { addMessage('No hay peers a los que invitar.'); return; }
+      addMessage(`📞 Invitando a ${arr.length} usuarios a llamada grupal...`, 'msg-me');
+
+      // Send a groupInvite message via dataConnections if available
+      arr.forEach(pid => {
+        if (dataConnections[pid]) {
+          try { dataConnections[pid].send({ type: 'groupInvite', from: myId }); } catch(e){}
+        }
+        // also attempt to call directly (will fail if not reachable)
+        startCall(pid);
+      });
     };
 
-    groupCallBtn.onclick = () => {
-      for (const id in connections) {
-        connections[id].send({ type: "groupCall" });
+    clearChatBtn.onclick = () => {
+      if (!isAdmin) { alert('Solo admin puede borrar chat.'); return; }
+      if (!confirm('Borrar chat para todos (envía notificación a todos)?')) return;
+      // notify
+      for (const k in dataConnections) {
+        try { dataConnections[k].send({ type: 'clearChat', from: myId }); } catch(e){}
       }
-      addMessage("📞 Invitación a videollamada grupal enviada.");
+      messagesDiv.innerHTML = '';
+      addMessage('🗑 Chat borrado por admin.', 'msg-me');
     };
 
-    // Limpiar al cerrar la pestaña
-    window.onbeforeunload = () => {
-      for (const id in connections) {
-        connections[id].close();
+    startLocalCam.onclick = async () => {
+      try {
+        await ensureLocalStream();
+      } catch (e) {
+        alert('No se pudo acceder a la cámara: ' + e);
       }
-      peer.destroy();
     };
+    stopLocalCam.onclick = () => stopLocalStream();
+
+    leaveAllCalls.onclick = () => {
+      for (const k in mediaCalls) {
+        try { mediaCalls[k].close(); } catch(e){}
+        delete mediaCalls[k];
+        removeRemoteVideo(k);
+      }
+      updateConnectionCount();
+      addMessage('📴 Has colgado todas las llamadas.', 'msg-me');
+    };
+
+    /*****************
+     * Periodic tasks
+     *****************/
+    // Intentar refrescar peers cada X segundos (si el servidor soporta)
+    setInterval(fetchPeersList, LOBBY_POLL_INTERVAL);
+
+    // Cuando se cierra la pestaña: limpiar
+    window.addEventListener('beforeunload', () => {
+      for (const k in dataConnections) {
+        try { dataConnections[k].close(); } catch (e) {}
+      }
+      try { peer.destroy(); } catch (e) {}
+    });
+
+    /*****************
+     * Inicializar: mostrar algo en el sidebar para que el usuario pueda conectar manualmente a otro ID
+     *****************/
+    // También mostraremos los peers con los que ya tenemos conexión
+    setTimeout(() => {
+      // show self
+      lastPeersSeen = lastPeersSeen || [];
+      if (!lastPeersSeen.includes(myId)) lastPeersSeen.push(myId);
+      renderSidebar(lastPeersSeen);
+    }, 800);
+
+    /*****************
+     * NOTA:
+     * - Este sistema intenta usar listAllPeers() para detección automática.
+     * - Además, cuando te conectas a un peer via connectToPeer(), se intercambian 'peersList' para propagar conocimiento.
+     * - Para un sistema completamente robusto en producción debería existir un "introducer" o servidor central que gestione la lista de usuarios.
+     *****************/
   </script>
 </body>
 </html>
-
-
