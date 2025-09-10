@@ -198,14 +198,21 @@ function generateClassIndex(){
 }
 
 // Botones
-enterChatBtn.onclick=()=>{
-  className=document.getElementById("classSelect").value;
-  number=document.getElementById("numberSelect").value;
-  nickname=document.getElementById("nickname").value.trim()||("User"+Math.floor(Math.random()*1000));
-  userId=`chat-${className}-${number}`;
+enterChatBtn.onclick = () => {
+  className = document.getElementById("classSelect").value;
+  number = document.getElementById("numberSelect").value;
+  nickname = document.getElementById("nickname").value.trim();
+
+  if (!nickname) {
+    alert("❌ Debes ingresar un apodo para entrar al chat.");
+    document.getElementById("nickname").focus();
+    return; // No deja continuar si no hay apodo
+  }
+
+  userId = `chat-${className}-${number}`;
   userSelector.classList.add("hidden");
   mainUI.classList.remove("hidden");
-  userInfo.textContent=`Tu ID: ${userId} - Apodo: ${nickname}`;
+  userInfo.textContent = `Tu ID: ${userId} - Apodo: ${nickname}`;
   generateClassIndex();
   setupPeer();
 };
