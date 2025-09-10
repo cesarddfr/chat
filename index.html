@@ -182,13 +182,29 @@ function callPeer(friendId){
 
 function endCurrentCall(){ if(currentCall){ currentCall.close(); currentCall=null; currentCallPeerId=null; } remoteVideo.srcObject=null; remoteLabel.textContent=""; }
 
+// Nombres personalizados por clase
+const nombresPorClase = {
+  "A": ["Alice","Bob","Charlie","David","Eva","Frank","Grace","Hugo","Iris","Jack",
+        "Karen","Leo","Mia","Nina","Oscar","Paula","Quinn","Rita","Sam","Tina",
+        "Ugo","Vera","Will","Xena","Yuri","Zara","Liam","Noah","Emma","Sophia"],
+  "B": ["Ana","Beto","Clara","Diego","Elena","Fernando","Gabriela","Héctor","Isabel","Javier",
+        "Karina","Luis","María","Natalia","Omar","Patricia","Rafael","Sofía","Tomás","Valeria",
+        "Uriel","Verónica","Walter","Ximena","Yolanda","Zoe","Lucas","Miguel","Daniel","Raquel"],
+  "C": ["Adrián","Brenda","César","Daniela","Esteban","Fabiana","Gustavo","Helena","Ignacio","Julieta",
+        "Kevin","Laura","Martín","Natalia","Oliver","Paola","Ricardo","Silvia","Tomás","Úrsula",
+        "Víctor","Wendy","Xavier","Yahir","Zulema","Manuel","Nora","Estefanía","Sebastián","Claudia"]
+};
+
 function generateClassIndex(){
   classIndex.innerHTML="";
   ["A","B","C"].forEach(cl=>{
     const header=document.createElement("div"); header.textContent="Clase "+cl; header.classList.add("class-header");
     const list=document.createElement("div"); list.classList.add("user-list"); list.id="list-"+cl;
-    for(let i=1;i<=30;i++){
-      const userItem=document.createElement("div"); userItem.textContent=`Usuario ${i}`; userItem.classList.add("user-item");
+    const nombres = nombresPorClase[cl] || [];
+    for(let i=0;i<30;i++){
+      const userItem=document.createElement("div");
+      userItem.textContent = nombres[i] || `Usuario ${i+1}`;
+      userItem.classList.add("user-item");
       userItem.onclick=()=>{ alert(`Iniciar chat con ${userItem.textContent} (implementar conexión)`); };
       list.appendChild(userItem);
     }
