@@ -1,207 +1,173 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Chat P2P — Conexión por ID</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    :root{--bg:#f4f6fb;--panel:#fff;--muted:#6b7280;--accent:#2563eb;--danger:#ef4444}
-    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
-    .app{display:grid;grid-template-columns:320px 1fr;gap:12px;height:100vh;padding:12px;background:var(--bg);box-sizing:border-box}
-    .sidebar{background:var(--panel);border-radius:12px;padding:12px;box-shadow:0 6px 20px rgba(2,6,23,0.06);display:flex;flex-direction:column}
-    .sidebar h3{margin:0 0 8px 0;font-size:16px}
-    .sidebar .info{font-size:13px;color:var(--muted);margin-bottom:8px}
-    .btn{padding:6px 8px;border-radius:8px;border:none;cursor:pointer;background:#eef2ff}
-    .btn.small{padding:4px 6px;font-size:13px}
-    .main{display:flex;flex-direction:column;gap:10px}
-    .top{display:flex;justify-content:space-between;gap:12px;align-items:center}
-    .panel{background:var(--panel);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
-    .chat-wrap{display:flex;gap:12px;height:calc(100vh - 200px)}
-    .chat{flex:1;display:flex;flex-direction:column}
-    #messages{flex:1;overflow:auto;padding:12px;border-radius:8px;border:1px solid #edf2f7;background:linear-gradient(180deg,#fff,#fbfdff)}
-    .message{margin:6px 0;padding:8px 10px;border-radius:8px;max-width:75%}
-    .msg-me{background:#e6f0ff;align-self:flex-end}
-    .msg-other{background:#f3f4f6;align-self:flex-start}
-    .meta{font-size:11px;color:var(--muted);margin-bottom:4px}
-    .controls{display:flex;gap:8px;align-items:center;margin-top:8px}
-    input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:1}
-    #videos{display:flex;gap:12px;flex-wrap:wrap;padding:8px;border-radius:8px;border:1px dashed #e6eef8;min-height:140px;background:linear-gradient(180deg,#fff,#fbfdff)}
-    .video-container{position:relative;width:260px;height:190px;border-radius:8px;overflow:hidden;background:black;display:flex;align-items:center;justify-content:center}
-    .video-container video{width:100%;height:100%;object-fit:cover}
-    .video-label{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.5);color:white;font-size:12px;padding:4px 6px;border-radius:6px}
-    .video-kick{position:absolute;top:6px;right:6px;display:none}
-    .video-container.admin .video-kick{display:block}
-    #votePanel{padding:10px;border-radius:8px;background:#fff4e6;border:1px solid #ffd8a8;display:none}
-    @media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{order:2;height:220px}.main{order:1}.chat-wrap{height:420px}}
-  </style>
+<meta charset="UTF-8">
+<title>Chat P2P por ID</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body, html{margin:0;padding:0;font-family:sans-serif;height:100%}
+.app{display:flex;height:100%}
+.sidebar{width:300px;padding:12px;background:#f0f0f0;box-sizing:border-box;display:flex;flex-direction:column}
+.main{flex:1;display:flex;flex-direction:column;padding:12px;box-sizing:border-box}
+#messages{flex:1;overflow:auto;padding:8px;border:1px solid #ccc;margin-bottom:8px;height:400px}
+.message{margin:4px 0;padding:6px 8px;border-radius:6px}
+.msg-me{background:#d0f0ff;align-self:flex-end}
+.msg-other{background:#f0f0f0;align-self:flex-start}
+.controls{display:flex;gap:4px}
+input[type=text]{flex:1;padding:6px;border-radius:4px;border:1px solid #ccc}
+button{padding:6px 8px;border-radius:4px;border:none;background:#007bff;color:white;cursor:pointer}
+button.small{padding:4px 6px;font-size:12px}
+#videos{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.video-container{position:relative;width:240px;height:180px;background:black;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.video-container video{width:100%;height:100%;object-fit:cover}
+.video-label{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.5);color:white;padding:2px 4px;border-radius:4px;font-size:12px}
+</style>
 </head>
 <body>
 <div class="app">
-  <!-- Sidebar con input de ID -->
-  <aside class="sidebar panel">
+  <div class="sidebar">
     <h3>Conectar a un usuario</h3>
-    <div class="info" id="sidebarInfo">Introduce el ID de un peer para chatear</div>
-    <div style="display:flex;gap:6px;margin-top:8px">
-      <input id="peerIdInput" type="text" placeholder="ID del peer" style="flex:1;padding:6px;border-radius:6px;border:1px solid #e6eef8" />
-      <button id="connectBtn" class="btn small">Conectar</button>
+    <input id="peerIdInput" placeholder="ID del peer">
+    <button id="connectBtn">Conectar</button>
+    <div style="margin-top:12px"><strong>Tu ID:</strong> <span id="meId"></span></div>
+  </div>
+  <div class="main">
+    <div id="messages"></div>
+    <div class="controls">
+      <input id="messageInput" placeholder="Escribe un mensaje">
+      <button id="sendBtn">Enviar</button>
+      <label class="btn small">📁<input type="file" id="fileInput" style="display:none"></label>
     </div>
-    <div style="margin-top:12px;font-size:13px;color:var(--muted)">
-      <div><strong>Tu nombre:</strong> <span id="meName"></span></div>
-      <div style="margin-top:6px"><strong>ID:</strong> <span id="meId"></span></div>
+    <div id="videos"></div>
+    <div style="margin-top:8px">
+      <button id="startCam" class="small">Iniciar cámara</button>
+      <button id="stopCam" class="small">Detener cámara</button>
     </div>
-  </aside>
-
-  <main class="main">
-    <div class="top">
-      <h2 style="margin:0">Chat P2P — Conexión por ID</h2>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button id="inviteAll" class="btn small">📞 Invitar a llamada</button>
-        <button id="proposeClear" class="btn small">🗑 Proponer borrar chat</button>
-      </div>
-    </div>
-
-    <div class="panel chat-wrap">
-      <section class="chat panel" style="flex:1 1 60%">
-        <div id="messages" aria-live="polite"></div>
-        <div class="controls">
-          <input id="messageInput" type="text" placeholder="Escribe un mensaje..." />
-          <button id="sendBtn" class="btn">Enviar</button>
-          <label class="btn small">📁<input id="fileInput" type="file" style="display:none"></label>
-          <div id="connCount" class="meta" style="margin-left:8px">Conexiones: 0</div>
-        </div>
-      </section>
-
-      <aside style="width:420px;display:flex;flex-direction:column;gap:8px">
-        <div class="panel">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <strong>Videollamadas</strong>
-            <span class="meta">Activas: <span id="activeCalls">0</span></span>
-          </div>
-          <div id="videos"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button id="startCam" class="btn small">Iniciar cámara</button>
-            <button id="stopCam" class="btn small">Detener cámara</button>
-            <button id="hangupAll" class="btn small">Colgar todo</button>
-          </div>
-        </div>
-
-        <div id="votePanel" class="panel"></div>
-      </aside>
-    </div>
-  </main>
+  </div>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-const userName = prompt('Pon tu nombre (único para esta sesión):') || ('user'+Math.floor(Math.random()*1000));
-const myId = `chat-${userName}`;
+const userName = prompt('Tu nombre:') || 'user'+Math.floor(Math.random()*1000);
+const myId = 'chat-'+userName;
+const meIdSpan = document.getElementById('meId');
+meIdSpan.textContent = myId;
+
 const peer = new Peer(myId);
 const dataConns = {}, mediaCalls = {};
 let localStream = null;
+
 const messagesDiv = document.getElementById('messages');
 const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
 const fileInput = document.getElementById('fileInput');
-const connCount = document.getElementById('connCount');
+
+const peerIdInput = document.getElementById('peerIdInput');
+const connectBtn = document.getElementById('connectBtn');
+
 const videosDiv = document.getElementById('videos');
 const startCamBtn = document.getElementById('startCam');
 const stopCamBtn = document.getElementById('stopCam');
-const hangupAllBtn = document.getElementById('hangupAll');
-const activeCallsSpan = document.getElementById('activeCalls');
-const inviteAllBtn = document.getElementById('inviteAll');
-const proposeClearBtn = document.getElementById('proposeClear');
-const votePanel = document.getElementById('votePanel');
-const peerIdInput = document.getElementById('peerIdInput');
-const connectBtn = document.getElementById('connectBtn');
-const meName = document.getElementById('meName');
-const meId = document.getElementById('meId');
-
-meName.textContent = userName;
-meId.textContent = myId;
 
 function addMessage(text, cls='msg-other'){
   const div = document.createElement('div');
-  div.className = `message ${cls}`;
-  const meta = document.createElement('div'); meta.className='meta'; meta.textContent = new Date().toLocaleTimeString();
-  const content = document.createElement('div'); content.textContent = text;
-  div.appendChild(meta); div.appendChild(content);
+  div.className = 'message '+cls;
+  div.textContent = text;
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-function updateConnCount(){
-  connCount.textContent = `Conexiones: ${Object.keys(dataConns).length}`;
-  activeCallsSpan.textContent = String(Object.keys(mediaCalls).length);
-}
+// Conectar a un peer por ID
+connectBtn.onclick = ()=>{
+  const target = peerIdInput.value.trim();
+  if(!target || target===myId){ alert('ID inválido'); return; }
+  if(dataConns[target]){ alert('Ya conectado'); return; }
+  const conn = peer.connect(target, {reliable:true});
+  conn.on('open', ()=>setupConn(conn));
+  conn.on('error', e=>alert('Error de conexión: '+e));
+};
 
-function connectToPeer(peerId){
-  if(peerId===myId) return;
-  if(dataConns[peerId]) return dataConns[peerId];
-  const conn = peer.connect(peerId, { reliable:true });
-  conn.on('open', ()=>setupDataConn(conn));
-  conn.on('error', err=>console.warn('conn err',err));
-  return conn;
-}
-
-function setupDataConn(conn){
+// Configuración de la conexión de datos
+function setupConn(conn){
   dataConns[conn.peer] = conn;
-  try{ conn.send({type:'join',id:myId,name:userName}); }catch(e){}
+  addMessage(`🔗 Conectado a ${conn.peer}`, 'msg-me');
   conn.on('data', data=>handleData(conn.peer,data));
   conn.on('close', ()=>{
-    delete dataConns[conn.peer]; addMessage(`⚠️ ${conn.peer} se desconectó`); updateConnCount();
+    addMessage(`⚠️ ${conn.peer} se desconectó`);
+    delete dataConns[conn.peer];
   });
-  updateConnCount();
 }
 
-peer.on('connection', conn=>{
-  setupDataConn(conn);
-  conn.on('open', ()=>{ try{ conn.send({type:'join',id:myId,name:userName}); }catch(e){} });
-});
+// Recibir conexiones entrantes
+peer.on('connection', conn=>{ setupConn(conn); });
 
-peer.on('open', id=>{
-  addMessage('✅ Conectado al servidor PeerJS con ID: '+id,'msg-me');
-});
-
-peer.on('error', e=>{ addMessage('❌ Error PeerJS: '+e,'msg-me'); console.error(e); });
-
+// Manejo de datos entrantes
 function handleData(from, data){
-  if(!data || typeof data!=='object') return;
   if(data.type==='chat'){ addMessage(`${data.name}: ${data.text}`,'msg-other'); }
-  else if(data.type==='file'){ const a=document.createElement('a'); a.href=data.url; a.download=data.fileName; a.textContent=`📎 ${data.name} envió ${data.fileName}`; const p=document.createElement('div'); p.className='message msg-other'; p.appendChild(a); messagesDiv.appendChild(p); }
+  else if(data.type==='file'){
+    const a=document.createElement('a'); a.href=data.url; a.download=data.fileName; a.textContent=`📎 ${data.name} envió ${data.fileName}`;
+    const div=document.createElement('div'); div.className='message msg-other'; div.appendChild(a); messagesDiv.appendChild(div);
+  }
 }
 
+// Enviar mensaje
 sendBtn.onclick = ()=>{
-  const t = messageInput.value.trim(); if(!t) return;
-  for(const k in dataConns){ try{ dataConns[k].send({type:'chat',name:userName,text:t}); }catch(e){} }
-  addMessage('Tú: '+t,'msg-me'); messageInput.value='';
+  const text = messageInput.value.trim();
+  if(!text) return;
+  for(const k in dataConns){ try{ dataConns[k].send({type:'chat',name:userName,text}); }catch(e){} }
+  addMessage('Tú: '+text,'msg-me');
+  messageInput.value='';
 };
-messageInput.addEventListener('keyup', e=>{ if(e.key==='Enter') sendBtn.click(); });
 
+// Enviar archivo
 fileInput.addEventListener('change', ()=>{
   const f = fileInput.files[0]; if(!f) return;
   const reader = new FileReader();
-  reader.onload = ()=>{ const url = URL.createObjectURL(new Blob([reader.result])); for(const k in dataConns){ try{ dataConns[k].send({type:'file',name:userName,fileName:f.name,url}); }catch(e){} } addMessage('📎 Tú enviaste: '+f.name,'msg-me'); };
-  reader.readAsArrayBuffer(f); fileInput.value='';
+  reader.onload = ()=>{
+    const url = URL.createObjectURL(new Blob([reader.result]));
+    for(const k in dataConns){ try{ dataConns[k].send({type:'file',name:userName,fileName:f.name,url}); }catch(e){} }
+    addMessage('📎 Enviaste: '+f.name,'msg-me');
+  };
+  reader.readAsArrayBuffer(f);
+  fileInput.value='';
 });
 
-connectBtn.onclick = ()=>{
-  const targetId = peerIdInput.value.trim();
-  if(!targetId) return alert('Introduce un ID válido');
-  if(targetId === myId) return alert('No puedes conectarte a ti mismo');
-  connectToPeer(targetId);
-  addMessage(`🔗 Intentando conectar con ${targetId}`, 'msg-me');
-};
+// Videollamada
+async function ensureLocalStream(){ 
+  if(localStream) return localStream;
+  localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  const localVideo = document.createElement('video');
+  localVideo.autoplay = true; localVideo.muted=true; localVideo.srcObject=localStream;
+  const cont=document.createElement('div'); cont.className='video-container'; cont.id='localVideoContainer'; cont.appendChild(localVideo);
+  const label = document.createElement('div'); label.className='video-label'; label.textContent='Tú'; cont.appendChild(label);
+  videosDiv.prepend(cont);
+  return localStream;
+}
 
-/* Videollamadas básicas */
-async function ensureLocalStream(){ if(localStream) return localStream; try{ localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true}); addLocalVideo(); return localStream; }catch(e){ alert('No se pudo acceder a cámara/micro: '+e); throw e; } }
-function addLocalVideo(){ const existing = document.getElementById('localVideoContainer'); if(existing) existing.remove(); const cont = document.createElement('div'); cont.id='localVideoContainer'; cont.className='video-container'; const v=document.createElement('video'); v.autoplay=true; v.muted=true; v.playsInline=true; v.srcObject = localStream; cont.appendChild(v); const label = document.createElement('div'); label.className='video-label'; label.textContent='Tú'; videosDiv.prepend(cont); }
-function createRemoteVideo(pid, stream){ if(document.getElementById('video-'+pid)) return; const cont=document.createElement('div'); cont.className='video-container'; cont.id='video-'+pid; const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.srcObject=stream; const label=document.createElement('div'); label.className='video-label'; label.textContent=pid.replace('chat-',''); cont.appendChild(v); cont.appendChild(label); videosDiv.appendChild(cont); }
-function removeRemoteVideo(pid){ const el=document.getElementById('video-'+pid); if(el) el.remove(); if(mediaCalls[pid]) delete mediaCalls[pid]; updateConnCount(); }
-async function startCall(pid){ await ensureLocalStream(); try{ const call = peer.call(pid, localStream); mediaCalls[pid]=call; updateConnCount(); call.on('stream', stream => createRemoteVideo(pid, stream)); call.on('close', ()=>removeRemoteVideo(pid)); }catch(e){ console.warn('call error',e); } }
-peer.on('call', async call=>{ await ensureLocalStream(); call.answer(localStream); mediaCalls[call.peer]=call; call.on('stream', stream=>createRemoteVideo(call.peer, stream)); call.on('close', ()=>removeRemoteVideo(call.peer)); });
+async function startCall(pid){ await ensureLocalStream(); try{
+  const call = peer.call(pid, localStream); mediaCalls[pid]=call;
+  call.on('stream', s=>{
+    const cont=document.createElement('div'); cont.className='video-container'; cont.id='video-'+pid;
+    const v=document.createElement('video'); v.autoplay=true; v.srcObject=s; cont.appendChild(v);
+    const label=document.createElement('div'); label.className='video-label'; label.textContent=pid; cont.appendChild(label);
+    videosDiv.appendChild(cont);
+  });
+  call.on('close', ()=>{ const el=document.getElementById('video-'+pid); if(el) el.remove(); delete mediaCalls[pid]; });
+}catch(e){console.warn(e);} }
+
+peer.on('call', async call=>{ await ensureLocalStream(); call.answer(localStream);
+  mediaCalls[call.peer]=call;
+  call.on('stream', s=>{
+    const cont=document.createElement('div'); cont.className='video-container'; cont.id='video-'+call.peer;
+    const v=document.createElement('video'); v.autoplay=true; v.srcObject=s; cont.appendChild(v);
+    const label=document.createElement('div'); label.className='video-label'; label.textContent=call.peer; cont.appendChild(label);
+    videosDiv.appendChild(cont);
+  });
+  call.on('close', ()=>{ const el=document.getElementById('video-'+call.peer); if(el) el.remove(); delete mediaCalls[call.peer]; });
+});
+
 startCamBtn.onclick = ()=>ensureLocalStream();
 stopCamBtn.onclick = ()=>{ if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; const el=document.getElementById('localVideoContainer'); if(el) el.remove(); } };
-hangupAllBtn.onclick = ()=>{ Object.keys(mediaCalls).forEach(pid=>{ try{ mediaCalls[pid].close(); }catch(e){} delete mediaCalls[pid]; removeRemoteVideo(pid); }); addMessage('📴 Has colgado todas las llamadas'); };
 </script>
 </body>
 </html>
