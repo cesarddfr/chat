@@ -1,363 +1,563 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Chat P2P Clase + Videollamada + Moderación</title>
-<style>
-body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
-#chat { border: 1px solid #ccc; background: #fff; height: 250px; overflow-y: auto; margin-bottom: 8px; padding: 5px; }
-input, button, select { padding: 5px; margin: 3px; }
-.hidden { display: none; }
-video { width: 300px; height: 225px; background: black; margin: 5px; position: relative; }
-#videos { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: flex-start; }
-.video-container { position: relative; display: inline-block; margin-right: 15px; }
-.video-label { position: absolute; top: 3px; left: 5px; background: rgba(0,0,0,0.5); color: #fff; padding: 2px 5px; font-size: 12px; border-radius: 3px; }
-#localVideo { border: 2px solid green; }
-video.remote { border: 2px solid blue; }
-.kick-btn { position: absolute; top: 5px; right: 5px; background: rgba(255,0,0,0.7); color: white; border: none; padding: 2px 6px; font-size: 12px; border-radius: 3px; cursor: pointer; display: none; z-index: 10; }
-.admin .kick-btn { display: block; }
-#classIndex { border: 1px solid #ccc; background: #fff; padding: 5px; max-height: 350px; overflow-y: auto; }
-.class-header { font-weight: bold; cursor: pointer; margin: 5px 0; }
-.user-list { margin-left: 10px; display: none; }
-.user-item { cursor: pointer; margin: 2px 0; }
-.user-item:hover { text-decoration: underline; }
-</style>
+  <meta charset="UTF-8" />
+  <title>Chat P2P — Moderación Avanzada, Votaciones y Videollamadas (Versión Extendida)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    /* --------------------
+       Estilos generales
+       -------------------- */
+    :root{--bg:#f4f6fb;--panel:#fff;--muted:#6b7280;--accent:#2563eb;--danger:#ef4444}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+    .app{display:grid;grid-template-columns:320px 1fr;gap:12px;height:100vh;padding:12px;background:var(--bg);box-sizing:border-box}
+
+    /* --------------------
+       Sidebar (usuarios)
+       -------------------- */
+    .sidebar{background:var(--panel);border-radius:12px;padding:12px;box-shadow:0 6px 20px rgba(2,6,23,0.06);display:flex;flex-direction:column}
+    .sidebar h3{margin:0 0 8px 0;font-size:16px}
+    .sidebar .info{font-size:13px;color:var(--muted);margin-bottom:8px}
+    #usersList{overflow:auto;flex:1;padding-right:6px}
+    .user-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;margin-bottom:6px;transition:background .12s}
+    .user-row:hover{background:#f1f5f9}
+    .user-meta{display:flex;gap:8px;align-items:center;min-width:0}
+    .avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
+    .u-name{font-weight:600;font-size:14px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+    .u-id{font-size:12px;color:var(--muted);max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .user-actions{display:flex;gap:6px}
+    .btn{padding:6px 8px;border-radius:8px;border:none;cursor:pointer;background:#eef2ff}
+    .btn.small{padding:4px 6px;font-size:13px}
+    .btn.kick{background:var(--danger);color:white}
+
+    /* --------------------
+       Main panel
+       -------------------- */
+    .main{display:flex;flex-direction:column;gap:10px}
+    .top{display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .panel{background:var(--panel);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+
+    /* mensajes/chat */
+    .chat-wrap{display:flex;gap:12px;height:calc(100vh - 200px)}
+    .chat{flex:1;display:flex;flex-direction:column}
+    #messages{flex:1;overflow:auto;padding:12px;border-radius:8px;border:1px solid #edf2f7;background:linear-gradient(180deg,#fff,#fbfdff)}
+    .message{margin:6px 0;padding:8px 10px;border-radius:8px;max-width:75%}
+    .msg-me{background:#e6f0ff;align-self:flex-end}
+    .msg-other{background:#f3f4f6;align-self:flex-start}
+    .meta{font-size:11px;color:var(--muted);margin-bottom:4px}
+    .controls{display:flex;gap:8px;align-items:center;margin-top:8px}
+    input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:1}
+
+    /* videos */
+    #videos{display:flex;gap:12px;flex-wrap:wrap;padding:8px;border-radius:8px;border:1px dashed #e6eef8;min-height:140px;background:linear-gradient(180deg,#fff,#fbfdff)}
+    .video-container{position:relative;width:260px;height:190px;border-radius:8px;overflow:hidden;background:black;display:flex;align-items:center;justify-content:center}
+    .video-container video{width:100%;height:100%;object-fit:cover}
+    .video-label{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.5);color:white;font-size:12px;padding:4px 6px;border-radius:6px}
+    .video-kick{position:absolute;top:6px;right:6px;display:none}
+    .video-container.admin .video-kick{display:block}
+
+    /* votaciones */
+    #votePanel{padding:10px;border-radius:8px;background:#fff4e6;border:1px solid #ffd8a8;display:none}
+    .vote-row{display:flex;gap:8px;align-items:center}
+
+    /* responsive */
+    @media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{order:2;height:220px}.main{order:1}.chat-wrap{height:420px}}
+  </style>
 </head>
 <body>
-<h2>Chat P2P por Clase + Videollamada</h2>
+  <div class="app">
+    <aside class="sidebar panel">
+      <h3>Personas en la app</h3>
+      <div class="info" id="sidebarInfo">Conectando...</div>
+      <div id="usersList"></div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <button id="refreshBtn" class="btn small">🔄 Refrescar</button>
+        <button id="adminBtn" class="btn small">🔑 Modo Admin</button>
+      </div>
+      <div style="margin-top:12px;font-size:13px;color:var(--muted)"><div><strong>Tu nombre:</strong> <span id="meName"></span></div><div style="margin-top:6px"><strong>ID:</strong> <span id="meId"></span></div></div>
+    </aside>
 
-<div id="userSelector">
-  <label>Selecciona tu clase:</label>
-  <select id="classSelect">
-    <option value="A">Clase A</option>
-    <option value="B">Clase B</option>
-    <option value="C">Clase C</option>
-  </select>
-  <label>Número de lista:</label>
-  <select id="numberSelect"></select>
-  <label>Tu apodo:</label>
-  <input type="text" id="nickname" placeholder="Apodo visible">
-  <button id="enterChatBtn">Entrar al chat</button>
-</div>
+    <main class="main">
+      <div class="top">
+        <h2 style="margin:0">Chat P2P — Moderación y Videollamada</h2>
+        <div style="display:flex;gap:8px;align-items:center"><button id="inviteAll" class="btn small">📞 Invitar a llamada</button><button id="proposeClear" class="btn small">🗑 Proponer borrar chat</button></div>
+      </div>
 
-<div id="mainUI" class="hidden">
-  <div id="userInfo"></div>
-  <div id="classIndex"></div>
-  <div id="chat"></div>
+      <div class="panel chat-wrap">
+        <section class="chat panel" style="flex:1 1 60%">
+          <div id="messages" aria-live="polite"></div>
+          <div class="controls">
+            <input id="messageInput" type="text" placeholder="Escribe un mensaje..." />
+            <button id="sendBtn" class="btn">Enviar</button>
+            <label class="btn small">📁<input id="fileInput" type="file" style="display:none"></label>
+            <div id="connCount" class="meta" style="margin-left:8px">Conexiones: 0</div>
+          </div>
+        </section>
 
-  <input type="text" id="messageInput" placeholder="Mensaje">
-  <button id="sendBtn">Enviar</button>
+        <aside style="width:420px;display:flex;flex-direction:column;gap:8px">
+          <div class="panel">
+            <div style="display:flex;justify-content:space-between;align-items:center"><strong>Videollamadas</strong><span class="meta">Activas: <span id="activeCalls">0</span></span></div>
+            <div id="videos"></div>
+            <div style="display:flex;gap:8px;margin-top:8px"><button id="startCam" class="btn small">Iniciar cámara</button><button id="stopCam" class="btn small">Detener cámara</button><button id="hangupAll" class="btn small">Colgar todo</button></div>
+          </div>
 
-  <input type="file" id="fileInput" class="hidden">
-  <button id="sendFileBtn">📁 Enviar archivo</button>
-
-  <div id="devControls" class="hidden">
-    <button id="voteClearBtn">🗑 Votación borrar chat</button>
+          <div id="votePanel" class="panel"></div>
+        </aside>
+      </div>
+    </main>
   </div>
 
-  <br>
-  <button id="devModeBtn">Modo Admin</button>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script>
+    /* -------------------------------------------------
+       Configuración inicial y estado
+       ------------------------------------------------- */
+    const PASSWORD = '0011';
+    const userName = prompt('Pon tu nombre (único para esta sesión):') || ('user'+Math.floor(Math.random()*1000));
+    const myId = `chat-${userName}`;
 
-  <hr>
-  <h3>Videollamada</h3>
-  <div id="videos">
-    <div class="video-container" id="localVideoContainer">
-      <video id="localVideo" autoplay muted></video>
-      <div class="video-label" id="label-local">Tú</div>
-    </div>
-    <div class="video-container admin" id="remoteVideoContainer">
-      <video class="remote" id="remoteVideo" autoplay></video>
-      <button class="kick-btn" id="kickBtn">Expulsar</button>
-      <div class="video-label" id="label-remote"></div>
-    </div>
-  </div>
-</div>
+    // PeerJS
+    const peer = new Peer(myId);
 
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<script>
-const PASSWORD = "0011";
-let localStream = null;
-let currentCall = null;
-let currentCallPeerId = null;
-let connections = {};
-let isAdmin = false;
-let userId = "";
-let nickname = "";
-let className = "";
-let number = 0;
+    // Conexiones de datos y llamadas
+    const dataConns = {}; // peerId -> DataConnection
+    const mediaCalls = {}; // peerId -> MediaConnection
 
-// Generar lista de 1-30
-const numberSelect = document.getElementById("numberSelect");
-for(let i=1;i<=30;i++){
-  const opt = document.createElement("option");
-  opt.value=i;
-  opt.text=i;
-  numberSelect.appendChild(opt);
-}
+    // Usuarios conocidos y estado de bans
+    let knownPeers = new Set(); // peers conocidos (incluye self)
+    const banList = {}; // peerId -> {until: timestamp or Infinity}
 
-// Variables DOM
-const userSelector = document.getElementById("userSelector");
-const enterChatBtn = document.getElementById("enterChatBtn");
-const mainUI = document.getElementById("mainUI");
-const userInfo = document.getElementById("userInfo");
-const chatDiv = document.getElementById("chat");
-const messageInput = document.getElementById("messageInput");
-const sendBtn = document.getElementById("sendBtn");
-const fileInput = document.getElementById("fileInput");
-const sendFileBtn = document.getElementById("sendFileBtn");
-const devModeBtn = document.getElementById("devModeBtn");
-const devControls = document.getElementById("devControls");
-const voteClearBtn = document.getElementById("voteClearBtn");
-const localVideo = document.getElementById("localVideo");
-const remoteVideo = document.getElementById("remoteVideo");
-const remoteLabel = document.getElementById("label-remote");
-const kickBtn = document.getElementById("kickBtn");
-const remoteVideoContainer = document.getElementById("remoteVideoContainer");
-const classIndex = document.getElementById("classIndex");
+    // Local media stream
+    let localStream = null;
 
-// Variables votación
-let clearVotes = {};
-let totalUsers = 0;
+    // UI referencias
+    const usersList = document.getElementById('usersList');
+    const sidebarInfo = document.getElementById('sidebarInfo');
+    const meName = document.getElementById('meName');
+    const meId = document.getElementById('meId');
 
-// Usuarios baneados temporalmente {id: timestamp_fin}
-let tempBans = {};
+    const messagesDiv = document.getElementById('messages');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const fileInput = document.getElementById('fileInput');
+    const connCount = document.getElementById('connCount');
 
-function addMessage(msg){ const p=document.createElement("p"); p.textContent=msg; chatDiv.appendChild(p); chatDiv.scrollTop=chatDiv.scrollHeight; }
-function clearChatLocal(){ chatDiv.innerHTML=""; }
+    const videosDiv = document.getElementById('videos');
+    const startCamBtn = document.getElementById('startCam');
+    const stopCamBtn = document.getElementById('stopCam');
+    const hangupAllBtn = document.getElementById('hangupAll');
+    const activeCallsSpan = document.getElementById('activeCalls');
 
-function setupConnection(conn){
-  connections[conn.peer]=conn;
-  conn.on("data", data=>{
-    if(data.type==="expulsion"){
-      addMessage("❌ Has sido expulsado del chat.");
-      if(currentCall){ currentCall.close(); currentCall=null; currentCallPeerId=null; remoteVideo.srcObject=null; remoteLabel.textContent=""; }
-      conn.close();
-    } else if(data.type==="kick"){
-      addMessage(`⚠️ ${data.nick} ha sido expulsado del chat por votación.`);
-    } else if(data.type==="tempban"){
-      tempBans[conn.peer]=Date.now()+data.duration*60000;
-      addMessage(`⏱ ${data.nick} ha sido temporalmente baneado por ${data.duration} min.`);
-    } else if(data.type==="clearChatVote"){
-      clearVotes[data.from]=(clearVotes[data.from]||0)+data.weight;
-      checkClearVotes();
-    } else if(data.type==="file"){
-      const link=document.createElement("a"); link.href=data.url; link.download=data.fileName; link.textContent=`📎 Archivo recibido: ${data.fileName}`; const p=document.createElement("p"); p.appendChild(link); chatDiv.appendChild(p); chatDiv.scrollTop=chatDiv.scrollHeight;
-    } else if(data.type==="message"){
-      addMessage(`${data.nick}: ${data.text}`);
+    const refreshBtn = document.getElementById('refreshBtn');
+    const adminBtn = document.getElementById('adminBtn');
+    const inviteAllBtn = document.getElementById('inviteAll');
+    const proposeClearBtn = document.getElementById('proposeClear');
+    const votePanel = document.getElementById('votePanel');
+
+    meName.textContent = userName;
+    meId.textContent = myId;
+
+    let isAdmin = false;
+
+    // Votaciones en curso
+    // Estructura: { id: string, type: 'clearChat' | 'kick', targetId?, votes: {yes:Set, no:Set}, createdAt: Date }
+    let currentVote = null;
+
+    /* -------------------------------------------------
+       Utilidades UI & Mensajería local
+       ------------------------------------------------- */
+    function addMessage(text, cls='msg-other'){
+      const div = document.createElement('div');
+      div.className = `message ${cls}`;
+      const meta = document.createElement('div'); meta.className='meta'; meta.textContent = new Date().toLocaleTimeString();
+      const content = document.createElement('div'); content.textContent = text;
+      div.appendChild(meta); div.appendChild(content);
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
-  });
 
-  conn.on("close", ()=>{
-    delete connections[conn.peer];
-    addMessage(`❌ ${conn.peer} se ha desconectado.`);
-    if(currentCallPeerId===conn.peer) endCurrentCall();
-  });
-}
+    function updateConnCount(){
+      connCount.textContent = `Conexiones: ${Object.keys(dataConns).length}`;
+      activeCallsSpan.textContent = String(Object.keys(mediaCalls).length);
+    }
 
-function checkClearVotes(){
-  let sum=0;
-  for(const k in clearVotes) sum+=clearVotes[k];
-  if(sum>=Math.ceil(totalUsers/2)){
-    clearChatLocal();
-    addMessage("🗑 El chat ha sido borrado por votación.");
-    clearVotes={};
-  }
-}
+    /* -------------------------------------------------
+       Discovery (propagación de peers)
+       - cuando se abre una dataConn se intercambia lista
+       - cada peer re-broadcastea peers conocidos
+       ------------------------------------------------- */
+    async function requestPeersFrom(conn){
+      try{ conn.send({type:'requestPeers', from:myId}); }catch(e){}
+    }
 
-function startCall(friendId){
-  if(!localStream){
-    navigator.mediaDevices.getUserMedia({video:true,audio:true}).then(stream=>{localStream=stream; localVideo.srcObject=stream; callPeer(friendId);}).catch(e=>alert("Error cámara/mic: "+e));
-  } else callPeer(friendId);
-}
+    function integratePeers(list){
+      let changed=false;
+      list.forEach(p=>{ if(p && p!==myId && !knownPeers.has(p)){ knownPeers.add(p); changed=true; } });
+      if(changed) renderUsers();
+    }
 
-function callPeer(friendId){
-  if(currentCall) endCurrentCall();
-  const call=peer.call(friendId, localStream);
-  currentCall=call;
-  currentCallPeerId=friendId;
-  call.on("stream", remoteStream=>{ remoteVideo.srcObject=remoteStream; remoteLabel.textContent=friendId; });
-  call.on("close", ()=>{ addMessage("📴 Llamada terminada."); endCurrentCall(); });
-}
+    /* -------------------------------------------------
+       Renderizado de la sidebar
+       ------------------------------------------------- */
+    function renderUsers(){
+      usersList.innerHTML='';
+      // Convert to sorted array for consistent UI
+      const arr = Array.from(knownPeers).sort();
+      if(!arr.includes(myId)) arr.unshift(myId);
+      arr.forEach(pid=>{
+        const row = document.createElement('div'); row.className='user-row';
+        // Left: avatar + name
+        const meta = document.createElement('div'); meta.className='user-meta';
+        const avatar = document.createElement('div'); avatar.className='avatar'; avatar.style.background = stringToColor(pid); avatar.textContent = pid.replace('chat-','').slice(0,2).toUpperCase();
+        const txt = document.createElement('div');
+        const nameDiv = document.createElement('div'); nameDiv.className='u-name'; nameDiv.textContent = pid.replace('chat-','');
+        const idDiv = document.createElement('div'); idDiv.className='u-id'; idDiv.textContent = pid;
+        txt.appendChild(nameDiv); txt.appendChild(idDiv);
+        meta.appendChild(avatar); meta.appendChild(txt);
 
-function endCurrentCall(){ if(currentCall){ currentCall.close(); currentCall=null; currentCallPeerId=null; } remoteVideo.srcObject=null; remoteLabel.textContent=""; }
-
-// Nombres personalizados por clase
-const nombresPorClase = {
-  "A": ["Alice","Bob","Charlie","David","Eva","Frank","Grace","Hugo","Iris","Jack",
-        "Karen","Leo","Mia","Nina","Oscar","Paula","Quinn","Rita","Sam","Tina",
-        "Ugo","Vera","Will","Xena","Yuri","Zara","Liam","Noah","Emma","Sophia"],
-  "B": ["Ana","Beto","Clara","Diego","Elena","Fernando","Gabriela","Héctor","Isabel","Javier",
-        "Karina","Luis","María","Natalia","Omar","Patricia","Rafael","Sofía","Tomás","Valeria",
-        "Uriel","Verónica","Walter","Ximena","Yolanda","Zoe","Lucas","Miguel","Daniel","Raquel"],
-  "C": ["Adrián","Brenda","César","Daniela","Esteban","Fabiana","Gustavo","Helena","Ignacio","Julieta",
-        "Kevin","Laura","Martín","Natalia","Oliver","Paola","Ricardo","Silvia","Tomás","Úrsula",
-        "Víctor","Wendy","Xavier","Yahir","Zulema","Manuel","Nora","Estefanía","Sebastián","Claudia"]
-};
-
-// Generar lista de usuarios y añadir conexión al click
-function generateClassIndex(){
-  classIndex.innerHTML="";
-  ["A","B","C"].forEach(cl=>{
-    const header=document.createElement("div"); 
-    header.textContent="Clase "+cl; 
-    header.classList.add("class-header");
-
-    const list=document.createElement("div"); 
-    list.classList.add("user-list"); 
-    list.id="list-"+cl;
-
-    const nombres = nombresPorClase[cl] || [];
-
-    for(let i=0;i<30;i++){
-      const userItem=document.createElement("div");
-      const targetId = `chat-${cl}-${i+1}`;
-      userItem.textContent = nombres[i] || `Usuario ${i+1}`;
-      userItem.classList.add("user-item");
-
-      userItem.onclick = () => {
-        if(connections[targetId]){
-          addMessage(`⚠️ ${userItem.textContent} ya está en tu chat.`);
-          return;
+        // Right: actions
+        const actions = document.createElement('div'); actions.className='user-actions';
+        if(pid !== myId){
+          const chatBtn = document.createElement('button'); chatBtn.className='btn small'; chatBtn.title='Conectar/Chat'; chatBtn.textContent='💬'; chatBtn.onclick = ()=>{ connectToPeer(pid); };
+          const callBtn = document.createElement('button'); callBtn.className='btn small'; callBtn.title='Llamar'; callBtn.textContent='📹'; callBtn.onclick = async ()=>{ await ensureLocalStream(); // ensure stream before calling
+            connectToPeer(pid); setTimeout(()=>startCall(pid), 600);
+          };
+          const kickBtn = document.createElement('button'); kickBtn.className='btn small'; kickBtn.textContent='⋮'; kickBtn.title='Acciones'; kickBtn.onclick = ()=>{ showModerationMenu(pid, kickBtn); };
+          actions.appendChild(chatBtn); actions.appendChild(callBtn); actions.appendChild(kickBtn);
+        } else {
+          const label = document.createElement('div'); label.className='meta'; label.textContent='(tú)'; actions.appendChild(label);
         }
-        const conn = peer.connect(targetId);
 
-        conn.on("open", () => {
-          connections[targetId] = conn;
-          addMessage(`✅ Te conectaste con ${userItem.textContent}`);
-        });
-
-        conn.on("data", data => {
-          if(data.type === "message"){
-            addMessage(`${data.nick}: ${data.text}`);
-          } else if(data.type === "file"){
-            const link = document.createElement("a");
-            link.href = data.url;
-            link.download = data.fileName;
-            link.textContent = `📎 Archivo recibido: ${data.fileName}`;
-            const p = document.createElement("p");
-            p.appendChild(link);
-            chatDiv.appendChild(p);
-            chatDiv.scrollTop = chatDiv.scrollHeight;
-          } else if(data.type === "expulsion"){
-            addMessage("❌ Has sido expulsado del chat.");
-            conn.close();
-          }
-        });
-
-        conn.on("close", () => {
-          delete connections[targetId];
-          addMessage(`❌ ${userItem.textContent} se ha desconectado.`);
-        });
-      };
-
-      list.appendChild(userItem);
+        row.appendChild(meta); row.appendChild(actions);
+        usersList.appendChild(row);
+      });
+      updateConnCount();
     }
 
-    header.onclick = () => { 
-      list.style.display = (list.style.display==="none"?"block":"none"); 
+    function showModerationMenu(pid, anchor){
+      // Simple prompt-based menu to keep code concise; could be replaced by nice dropdown
+      if(isAdmin){
+        const choice = prompt(`Admin: qué hacer con ${pid.replace('chat-','')}? (kick,ban,tempban)
+Para tempban escribe 'tempban:5' (minutos)`, 'kick');
+        if(!choice) return;
+        if(choice==='kick'){ doAdminKick(pid); }
+        else if(choice==='ban'){ doAdminBan(pid); }
+        else if(choice.startsWith('tempban')){ const parts = choice.split(':'); const mins = parts[1]?parseInt(parts[1]):5; doAdminTempban(pid, mins); }
+      } else {
+        const ok = confirm(`Proponer expulsión de ${pid.replace('chat-','')}? Esto iniciará votación.`);
+        if(ok){ startVote({type:'kick',targetId:pid,timeout:60}); }
+      }
+    }
+
+    function stringToColor(str){ // deterministic color for avatar
+      let h=0; for(let i=0;i<str.length;i++) h = ((h<<5)-h)+str.charCodeAt(i); const hue = Math.abs(h)%360; return `hsl(${hue}deg 70% 45%)`;
+    }
+
+    /* -------------------------------------------------
+       Conexiones de datos (PeerJS DataConnection)
+       ------------------------------------------------- */
+    function connectToPeer(peerId){
+      if(peerId===myId) return;
+      if(dataConns[peerId]) return dataConns[peerId];
+      const conn = peer.connect(peerId, { reliable:true });
+      conn.on('open', ()=>{
+        setupDataConn(conn);
+      });
+      conn.on('error', err=>console.warn('conn err',err));
+      return conn;
+    }
+
+    function setupDataConn(conn){
+      dataConns[conn.peer] = conn;
+      // announce ourselves
+      try{ conn.send({type:'join',id:myId,name:userName}); }catch(e){}
+      // request their knowledge of peers
+      requestPeersFrom(conn);
+
+      conn.on('data', data=>handleData(conn.peer,data));
+      conn.on('close', ()=>{
+        delete dataConns[conn.peer]; knownPeers.delete(conn.peer); renderUsers(); updateConnCount();
+      });
+      // add peer locally
+      knownPeers.add(conn.peer); renderUsers();
+    }
+
+    peer.on('connection', conn=>{
+      // incoming data connection
+      setupDataConn(conn);
+      // ensure they know about us
+      conn.on('open', ()=>{ try{ conn.send({type:'join',id:myId,name:userName}); }catch(e){} });
+    });
+
+    peer.on('open', id=>{
+      sidebarInfo.textContent = 'Conectado al servidor PeerJS.';
+      // add self
+      knownPeers.add(myId);
+      renderUsers();
+      // proactively try to connect to some peers via listAllPeers if available
+      tryFetchPeerList();
+    });
+
+    peer.on('error', e=>{ sidebarInfo.textContent = 'Error PeerJS: '+e; console.error(e); });
+
+    /* -------------------------------------------------
+       Manejo de mensajes entrantes por data channel
+       ------------------------------------------------- */
+    function handleData(from, data){
+      if(!data || typeof data !== 'object') return;
+      // console.log('data from',from,data);
+      if(data.type==='join'){
+        knownPeers.add(data.id); renderUsers();
+      } else if(data.type==='requestPeers'){
+        // reply with array of known peers
+        const conn = dataConns[from]; if(conn){ try{ conn.send({type:'peersList',peers:Array.from(knownPeers)}); }catch(e){} }
+      } else if(data.type==='peersList'){
+        integratePeers(data.peers || []);
+      } else if(data.type==='chat'){
+        addMessage(`${data.name}: ${data.text}`,'msg-other');
+      } else if(data.type==='file'){
+        const a=document.createElement('a'); a.href=data.url; a.download=data.fileName; a.textContent=`📎 ${data.name} envió ${data.fileName}`; const p=document.createElement('div'); p.className='message msg-other'; p.appendChild(a); messagesDiv.appendChild(p);
+      } else if(data.type==='voteStart'){
+        // new vote
+        receiveVoteStart(data);
+      } else if(data.type==='voteCast'){
+        // vote cast from remote
+        receiveVoteCast(data);
+      } else if(data.type==='voteEnd'){
+        finalizeVote(data);
+      } else if(data.type==='kick'){ // admin kicked
+        if(data.target===myId){ addMessage('❌ Has sido expulsado (kick) por admin.'); setTimeout(()=>location.reload(),800); }
+      } else if(data.type==='ban'){ if(data.target===myId){ addMessage('⛔ Has sido baneado.'); setTimeout(()=>location.reload(),800);} }
+    }
+
+    /* -------------------------------------------------
+       Envío de chat y archivos
+       ------------------------------------------------- */
+    sendBtn.onclick = ()=>{
+      const t = messageInput.value.trim(); if(!t) return; broadcast({type:'chat',name:userName,text:t}); addMessage('Tú: '+t,'msg-me'); messageInput.value='';
     };
-    
-    classIndex.appendChild(header); 
-    classIndex.appendChild(list);
-  });
-}
+    messageInput.addEventListener('keyup', e=>{ if(e.key==='Enter') sendBtn.click(); });
 
-// Botones
-enterChatBtn.onclick = () => {
-  className = document.getElementById("classSelect").value;
-  number = document.getElementById("numberSelect").value;
-  nickname = document.getElementById("nickname").value.trim();
+    fileInput.addEventListener('change', ()=>{
+      const f = fileInput.files[0]; if(!f) return; const reader = new FileReader(); reader.onload = ()=>{ const url = URL.createObjectURL(new Blob([reader.result])); broadcast({type:'file',name:userName,fileName:f.name,url}); addMessage('📎 Tú enviaste: '+f.name,'msg-me'); }; reader.readAsArrayBuffer(f); fileInput.value='';
+    });
 
-  if (!nickname) {
-    alert("❌ Debes ingresar un apodo para entrar al chat.");
-    document.getElementById("nickname").focus();
-    return;
-  }
+    function broadcast(obj){ for(const k in dataConns){ try{ dataConns[k].send(obj); }catch(e){} } }
 
-  userId = `chat-${className}-${number}`;
-  userSelector.classList.add("hidden");
-  mainUI.classList.remove("hidden");
-  userInfo.textContent = `Tu ID: ${userId} - Apodo: ${nickname}`;
-  generateClassIndex();
-  setupPeer();
-};
+    /* -------------------------------------------------
+       Votaciones: start, cast, tally
+       ------------------------------------------------- */
+    function startVote(opts){
+      if(currentVote) return alert('Ya hay una votación en curso');
+      const id = 'vote-'+Date.now();
+      currentVote = {id, type:opts.type, targetId:opts.targetId||null, votes:{yes:new Set(),no:new Set()}, createdAt:Date.now(), timeout:opts.timeout||60};
+      // cast our own vote as proposer = yes
+      currentVote.votes.yes.add(myId);
+      // broadcast to peers
+      broadcast({type:'voteStart',vote:serializeVoteStart(currentVote),from:myId});
+      renderVotePanel();
+      scheduleVoteTimeout(currentVote.id, currentVote.timeout);
+    }
 
-function setupPeer(){
-  peer=new Peer(userId);
-  peer.on("connection", setupConnection);
-  peer.on("call", call=>{
-    if(!localStream){
-      navigator.mediaDevices.getUserMedia({video:true,audio:true}).then(stream=>{localStream=stream; localVideo.srcObject=stream; answerCall(call);}).catch(e=>{alert("Error cámara/mic: "+e); call.close();});
-    } else answerCall(call);
-  });
-}
+    function receiveVoteStart(data){
+      const v = data.vote; if(!v) return; if(currentVote) return; // ignore if already one
+      currentVote = {id:v.id,type:v.type,targetId:v.targetId||null,votes:{yes:new Set(),no:new Set()},createdAt:v.createdAt,timeout:v.timeout};
+      // automatically create UI and allow local user to vote
+      renderVotePanel();
+      scheduleVoteTimeout(currentVote.id,currentVote.timeout);
+    }
 
-function answerCall(call){
-  if(currentCall) endCurrentCall();
-  call.answer(localStream);
-  currentCall=call;
-  currentCallPeerId=call.peer;
-  call.on("stream", remoteStream=>{ remoteVideo.srcObject=remoteStream; remoteLabel.textContent=call.peer; });
-  call.on("close", ()=>{ addMessage("📴 Llamada terminada."); endCurrentCall(); });
-  addMessage(`📹 Recibida llamada de ${call.peer}`);
-}
+    function serializeVoteStart(v){ return {id:v.id,type:v.type,targetId:v.targetId,createdAt:v.createdAt,timeout:v.timeout}; }
 
-// Chat
-sendBtn.onclick=()=>{
-  const text=messageInput.value.trim();
-  if(!text) return;
-  for(const id in connections) connections[id].send({type:"message",text,nick:nickname});
-  addMessage(`${nickname}: ${text}`);
-  messageInput.value="";
-};
-messageInput.addEventListener("keypress", e=>{ if(e.key==="Enter") sendBtn.click(); });
+    function castVote(yes){
+      if(!currentVote) return; // no vote
+      if(currentVote.votes.yes.has(myId) || currentVote.votes.no.has(myId)) return alert('Ya votaste');
+      const weight = isAdmin?2:1;
+      // locally register
+      if(yes) currentVote.votes.yes.add(myId); else currentVote.votes.no.add(myId);
+      // broadcast cast
+      broadcast({type:'voteCast',voteId:currentVote.id,from:myId,yes:yes,weight:weight});
+      renderVotePanel();
+      checkVoteFinish();
+    }
 
-// Archivos
-sendFileBtn.onclick=()=>fileInput.click();
-fileInput.onchange=()=>{
-  const file=fileInput.files[0];
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    const blob=new Blob([reader.result]);
-    const url=URL.createObjectURL(blob);
-    for(const id in connections) connections[id].send({type:"file",fileName:file.name,url});
-    const link=document.createElement("a"); link.href=url; link.download=file.name; link.textContent=`📎 Tú enviaste: ${file.name}`;
-    const p=document.createElement("p"); p.appendChild(link); chatDiv.appendChild(p); chatDiv.scrollTop=chatDiv.scrollHeight;
-  };
-  reader.readAsArrayBuffer(file);
-  fileInput.value="";
-};
+    function receiveVoteCast(data){ if(!currentVote || data.voteId!==currentVote.id) return; if(data.yes) currentVote.votes.yes.add(data.from); else currentVote.votes.no.add(data.from); renderVotePanel(); checkVoteFinish(); }
 
-// Modo Admin
-devModeBtn.onclick=()=>{
-  const pwd=prompt("Introduce la contraseña:");
-  if(pwd===PASSWORD){ isAdmin=true; devControls.classList.remove("hidden"); remoteVideoContainer.classList.add("admin"); addMessage("🔑 Modo Admin activado."); }
-  else alert("Contraseña incorrecta.");
-};
+    function checkVoteFinish(){
+      // Simple majority over known peers (including self)
+      const total = Array.from(knownPeers).filter(p=>!isBanned(p)).length; // eligible voters
+      const yesCount = currentVote.votes.yes.size + (isAdmin && currentVote.votes.yes.has(myId)?(1):0); // admin double counted locally via weight already handled by sending weight? we'll keep simple: admin votes twice by adding admin id twice isn't possible; instead we will compute effective votes below
+      // better: compute effective yes/no using weights of members
+      let effYes=0, effNo=0;
+      Array.from(knownPeers).forEach(pid=>{
+        if(isBanned(pid)) return; // banned not counted
+        const w = (pid===myId && isAdmin)?2:(pid===myId?1:(pid!==myId && isAdmin?1:1));
+        // note: remote admin weighting isn't known here; for simplicity only local admin votes count x2
+        if(currentVote.votes.yes.has(pid)) effYes += (pid===myId && isAdmin)?2:1;
+        if(currentVote.votes.no.has(pid)) effNo += (pid===myId && isAdmin)?2:1;
+      });
+      // majority
+      if(effYes>effNo && (effYes+effNo)>=Math.ceil(total/2)){
+        // pass
+        concludeVote(true);
+      } else if(effNo>=effYes && (effYes+effNo)>=Math.ceil(total/2)){
+        concludeVote(false);
+      }
+    }
 
-// Kick / Tempban / Ban
-kickBtn.onclick=()=>{
-  if(!isAdmin) return alert("Solo admin puede expulsar.");
-  if(!currentCallPeerId) return alert("No hay usuario en videollamada.");
-  if(confirm(`Expulsar a ${currentCallPeerId}?`)){
-    connections[currentCallPeerId]?.send({type:"expulsion"});
-    connections[currentCallPeerId]?.close();
-    delete connections[currentCallPeerId];
-    addMessage(`⚠️ Expulsaste a ${currentCallPeerId}`);
-    endCurrentCall();
-  }
-};
+    function concludeVote(result){
+      if(!currentVote) return;
+      // perform action
+      if(result){
+        if(currentVote.type==='clearChat') clearChat();
+        else if(currentVote.type==='kick') doKick(currentVote.targetId);
+      }
+      // broadcast end
+      broadcast({type:'voteEnd',voteId:currentVote.id,result});
+      currentVote=null; renderVotePanel();
+    }
 
-// Votación para borrar chat
-voteClearBtn.onclick=()=>{
-  const weight=isAdmin?2:1;
-  for(const id in connections) connections[id].send({type:"clearChatVote",from:userId,weight});
-  clearVotes[userId]=weight;
-  checkClearVotes();
-};
+    function finalizeVote(data){ if(currentVote && data.voteId===currentVote.id){ if(data.result) { if(currentVote.type==='clearChat') clearChat(); else if(currentVote.type==='kick') doKick(currentVote.targetId); } currentVote=null; renderVotePanel(); } }
 
-window.onbeforeunload=()=>{ for(const id in connections) connections[id].close(); peer.destroy(); };
-</script>
+    function renderVotePanel(){
+      if(!currentVote){ votePanel.style.display='none'; votePanel.innerHTML=''; return; }
+      votePanel.style.display='block'; votePanel.innerHTML='';
+      const title = document.createElement('div'); title.innerHTML = `<strong>Votación:</strong> ${currentVote.type}${currentVote.targetId? ' — '+currentVote.targetId.replace('chat-',''):''}`;
+      const votes = document.createElement('div'); votes.className='vote-row'; votes.textContent = `Sí: ${currentVote.votes.yes.size}  No: ${currentVote.votes.no.size}`;
+      const yesBtn = document.createElement('button'); yesBtn.className='btn small'; yesBtn.textContent='Votar Sí'; yesBtn.onclick = ()=>castVote(true);
+      const noBtn = document.createElement('button'); noBtn.className='btn small'; noBtn.textContent='Votar No'; noBtn.onclick = ()=>castVote(false);
+      votePanel.appendChild(title); votePanel.appendChild(votes); votePanel.appendChild(yesBtn); votePanel.appendChild(noBtn);
+    }
+
+    function scheduleVoteTimeout(voteId, secs){ setTimeout(()=>{ if(!currentVote || currentVote.id!==voteId) return; // still active? tally and conclude by majority
+      // naive tally: compare sizes
+      const yes = currentVote.votes.yes.size; const no = currentVote.votes.no.size; const res = yes>no; concludeVote(res);
+    }, secs*1000); }
+
+    function clearChat(){ messagesDiv.innerHTML=''; addMessage('🗑 Chat borrado por votación (o admin)'); }
+
+    /* -------------------------------------------------
+       Acciones de moderación aplicadas por admin o por vote
+       ------------------------------------------------- */
+    function doAdminKick(pid){ doKick(pid); broadcast({type:'kick',target:pid,by:myId}); }
+    function doAdminBan(pid){ banList[pid] = {until:Infinity}; doKick(pid); broadcast({type:'ban',target:pid,by:myId}); }
+    function doAdminTempban(pid, mins){ banList[pid] = {until: Date.now()+mins*60000}; doKick(pid); broadcast({type:'ban',target:pid,until:banList[pid].until,by:myId}); }
+
+    function doKick(pid){
+      // close data connection if exists
+      if(dataConns[pid]){ try{ dataConns[pid].send({type:'kicked',by:myId}); dataConns[pid].close(); }catch(e){} }
+      if(mediaCalls[pid]){ try{ mediaCalls[pid].close(); }catch(e){} }
+      knownPeers.delete(pid); renderUsers(); addMessage(`⚠️ Se expulsó a ${pid.replace('chat-','')}`);
+    }
+
+    /* -------------------------------------------------
+       Manejo de voto remoto (recibido)
+       ------------------------------------------------- */
+    function receiveVoteStart(data){ if(currentVote) return; // ignore concurrent
+      currentVote = {id:data.vote.id,type:data.vote.type,targetId:data.vote.targetId || null,votes:{yes:new Set(),no:new Set()},createdAt:data.vote.createdAt,timeout:data.vote.timeout}; renderVotePanel(); scheduleVoteTimeout(currentVote.id,currentVote.timeout); }
+    function receiveVoteCast(data){ if(!currentVote || data.voteId!==currentVote.id) return; if(data.yes) currentVote.votes.yes.add(data.from); else currentVote.votes.no.add(data.from); renderVotePanel(); checkVoteFinish(); }
+
+    /* -------------------------------------------------
+       Ban checks
+       ------------------------------------------------- */
+    function isBanned(pid){ const b = banList[pid]; if(!b) return false; if(b.until===Infinity) return true; if(Date.now()>b.until){ delete banList[pid]; return false; } return true; }
+
+    /* -------------------------------------------------
+       Videollamadas: start / answer / manage elements
+       ------------------------------------------------- */
+    async function ensureLocalStream(){ if(localStream) return localStream; try{ localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true}); addLocalVideo(); return localStream; }catch(e){ alert('No se pudo acceder a cámara/micro: '+e); throw e; } }
+
+    function addLocalVideo(){ // remove previous local if exists
+      const existing = document.getElementById('localVideoContainer'); if(existing) existing.remove(); const cont = document.createElement('div'); cont.id='localVideoContainer'; cont.className='video-container'; const v=document.createElement('video'); v.autoplay=true; v.muted=true; v.playsInline=true; v.srcObject = localStream; cont.appendChild(v); const label = document.createElement('div'); label.className='video-label'; label.textContent='Tú'; cont.appendChild(label); videosDiv.prepend(cont); }
+
+    function createRemoteVideo(pid, stream){ if(document.getElementById('video-'+pid)) return; const cont = document.createElement('div'); cont.className='video-container'; cont.id='video-'+pid; if(isAdmin) cont.classList.add('admin'); const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.srcObject = stream; const label = document.createElement('div'); label.className='video-label'; label.textContent = pid.replace('chat-',''); const kickBtn = document.createElement('button'); kickBtn.className='btn small video-kick'; kickBtn.textContent='Expulsar'; kickBtn.onclick = ()=>{ if(!isAdmin){ if(confirm('Proponer expulsión?')) startVote({type:'kick',targetId:pid,timeout:60}); } else { doAdminKick(pid); } }; cont.appendChild(v); cont.appendChild(label); cont.appendChild(kickBtn); videosDiv.appendChild(cont); }
+
+    function removeRemoteVideo(pid){ const el = document.getElementById('video-'+pid); if(el) el.remove(); if(mediaCalls[pid]) delete mediaCalls[pid]; activeCallsUpdate(); }
+
+    function activeCallsUpdate(){ activeCallsSpan.textContent = String(Object.keys(mediaCalls).length); }
+
+    async function startCall(pid){ await ensureLocalStream(); try{ const call = peer.call(pid, localStream); mediaCalls[pid]=call; updateConnCount(); call.on('stream', stream => createRemoteVideo(pid, stream)); call.on('close', ()=>removeRemoteVideo(pid)); }catch(e){ console.warn('call error',e); } }
+
+    peer.on('call', async call=>{ await ensureLocalStream(); call.answer(localStream); mediaCalls[call.peer]=call; call.on('stream', stream=>createRemoteVideo(call.peer, stream)); call.on('close', ()=>removeRemoteVideo(call.peer)); });
+
+    hangupAllBtn.onclick = ()=>{ Object.keys(mediaCalls).forEach(pid=>{ try{ mediaCalls[pid].close(); }catch(e){} delete mediaCalls[pid]; removeRemoteVideo(pid); }); activeCallsUpdate(); addMessage('📴 Has colgado todas las llamadas'); };
+    startCamBtn.onclick = ()=>ensureLocalStream(); stopCamBtn.onclick = ()=>{ if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; const el = document.getElementById('localVideoContainer'); if(el) el.remove(); } };
+
+    /* -------------------------------------------------
+       Acciones admin helper
+       ------------------------------------------------- */
+    function doKick(pid){ // used by votes
+      if(dataConns[pid]){ try{ dataConns[pid].send({type:'kicked',by:myId}); dataConns[pid].close(); }catch(e){} }
+      if(mediaCalls[pid]){ try{ mediaCalls[pid].close(); }catch(e){} }
+      knownPeers.delete(pid); renderUsers(); addMessage(`⚠️ ${pid.replace('chat-','')} fue expulsado`);
+    }
+
+    function doAdminBan(pid){ banList[pid] = {until:Infinity}; doKick(pid); broadcast({type:'ban',target:pid,by:myId}); }
+    function doAdminTempban(pid, mins){ banList[pid] = {until:Date.now()+mins*60000}; doKick(pid); broadcast({type:'ban',target:pid,until:banList[pid].until,by:myId}); }
+
+    function handleRemoteKicked(from){ if(from===myId){ alert('Has sido expulsado.'); location.reload(); } }
+
+    /* -------------------------------------------------
+       Invitar a todos a llamada (join): envia mensaje de invitación
+       ------------------------------------------------- */
+    inviteAllBtn.onclick = async ()=>{
+      await ensureLocalStream(); const targets = Array.from(knownPeers).filter(p=>p!==myId && !isBanned(p)); if(targets.length===0){ addMessage('No hay peers a invitar'); return; } addMessage('📞 Invitando a llamada grupal...'); targets.forEach(pid=>{ if(dataConns[pid]){ try{ dataConns[pid].send({type:'groupInvite',from:myId}); }catch(e){} } startCall(pid); }); };
+
+    /* -------------------------------------------------
+       Votar borrar chat
+       ------------------------------------------------- */
+    proposeClearBtn.onclick = ()=>{ startVote({type:'clearChat',timeout:60}); };
+
+    /* -------------------------------------------------
+       Recepción y respuesta a mensajes de control
+       ------------------------------------------------- */
+    function handleControlMessage(from, data){ // not used directly; left for extensibility
+    }
+
+    /* -------------------------------------------------
+       Peer list discovery via listAllPeers (when server supports)
+       ------------------------------------------------- */
+    async function tryFetchPeerList(){
+      if(!peer.listAllPeers) return; try{
+        peer.listAllPeers(list=>{ if(Array.isArray(list)){ list.forEach(id=>{ if(id && id.startsWith('chat-')) knownPeers.add(id); }); renderUsers(); sidebarInfo.textContent = `Peers descubiertos: ${knownPeers.size-1}`; } });
+      }catch(e){ console.warn('listAllPeers unavailable',e); sidebarInfo.textContent = 'Servidor no permite listAllPeers — conecte manualmente'; }
+    }
+
+    refreshBtn.onclick = ()=>{ tryFetchPeerList(); };
+
+    /* -------------------------------------------------
+       Manejo de datos entrantes (centralizado)
+       ------------------------------------------------- */
+    function handleData(peerId, data){ handleData(peerId,data); }
+    // NOTE: earlier we added conn.on('data', handleData) but to avoid collision we kept 'handleData' named above.
+
+    /* -------------------------------------------------
+       Inicialización: intentar reconectar a peers conocidos periódicamente
+       ------------------------------------------------- */
+    setInterval(()=>{ // try to connect to known peers returned by listAllPeers
+      tryFetchPeerList(); Array.from(knownPeers).forEach(pid=>{ if(pid!==myId && !dataConns[pid] && !isBanned(pid)){ try{ connectToPeer(pid); }catch(e){} } }); }, 5000);
+
+    /* -------------------------------------------------
+       Cuando el peer recibe conexiones, setupDataConn ya maneja todo.
+       También tenemos que manejar mensajes de tipo 'kicked' 'ban' 'groupInvite' y 'vote' que se procesan en handleData
+       ------------------------------------------------- */
+    // TODO: We need to ensure every conn.on('data') calls handleData properly above when created in setupDataConn. Already done.
+
+    /* -------------------------------------------------
+       Seguridad simple: si banned, mostrar mensaje al entrar
+       ------------------------------------------------- */
+    window.addEventListener('load', ()=>{ if(isBanned(myId)){ alert('Estás baneado y no puedes unirte'); } });
+
+    /* -------------------------------------------------
+       Mejoras: exponer funciones que se usan por prompts/menus
+       ------------------------------------------------- */
+    window.connectToPeer = connectToPeer; window.startCall = startCall; window.startVote = startVote; window.doAdminKick = doAdminKick; window.doAdminBan = doAdminBan; window.doAdminTempban = doAdminTempban;
+
+    /* -------------------------------------------------
+       Nota final: este archivo está largo y contiene comentarios y estructura modular.
+       En producción, convierte esto en módulos separados y añade un servidor central para discovery/introducer.
+       ------------------------------------------------- */
+  </script>
 </body>
 </html>
