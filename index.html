@@ -2,252 +2,245 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Chat P2P — Moderación Avanzada y Videollamadas</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chat P2P — Amigos, Admin y Videollamada</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-:root{--bg:#f4f6fb;--panel:#fff;--muted:#6b7280;--accent:#2563eb;--danger:#ef4444}
-html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:#000;color:#fff}
-.center-screen{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:12px;background:rgba(0,0,0,0.8);padding:20px;border-radius:12px}
-input[type=text]{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:1;color:#000}
-.btn{padding:6px 12px;border-radius:8px;border:none;cursor:pointer;background:#2563eb;color:white}
-.sidebar{background:var(--panel);border-radius:12px;padding:12px;box-shadow:0 6px 20px rgba(2,6,23,0.06);display:flex;flex-direction:column;max-height:100vh;overflow:auto}
-.user-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;margin-bottom:6px;transition:background .12s}
-.user-meta{display:flex;gap:8px;align-items:center;min-width:0}
-.avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
-.u-name{font-weight:600;font-size:14px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
-.u-id{font-size:12px;color:var(--muted);max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.user-actions{display:flex;gap:6px}
-.btn.small{padding:4px 6px;font-size:13px}
-.panel{background:var(--panel);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
-#videos{display:flex;gap:12px;flex-wrap:wrap;padding:8px;border-radius:8px;border:1px dashed #e6eef8;min-height:140px;background:linear-gradient(180deg,#fff,#fbfdff)}
-.video-container{position:relative;width:260px;height:190px;border-radius:8px;overflow:hidden;background:black;display:flex;align-items:center;justify-content:center}
-.video-container video{width:100%;height:100%;object-fit:cover}
-.video-label{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.5);color:white;font-size:12px;padding:4px 6px;border-radius:6px}
+  :root{--bg:#f4f6fb;--panel:#fff;--muted:#6b7280;--accent:#2563eb;--danger:#ef4444}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+  .app{display:grid;grid-template-columns:320px 1fr;gap:12px;height:100vh;padding:12px;background:var(--bg);box-sizing:border-box}
+  .sidebar{background:var(--panel);border-radius:12px;padding:12px;box-shadow:0 6px 20px rgba(2,6,23,0.06);display:flex;flex-direction:column}
+  .sidebar h3{margin:0 0 8px 0;font-size:16px}
+  .sidebar .info{font-size:13px;color:var(--muted);margin-bottom:8px}
+  #usersList{overflow:auto;flex:1;padding-right:6px}
+  .user-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;margin-bottom:6px;transition:background .12s}
+  .user-row:hover{background:#f1f5f9}
+  .user-meta{display:flex;gap:8px;align-items:center;min-width:0}
+  .avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
+  .u-name{font-weight:600;font-size:14px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+  .u-id{font-size:12px;color:var(--muted);max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .user-actions{display:flex;gap:6px}
+  .btn{padding:6px 8px;border-radius:8px;border:none;cursor:pointer;background:#eef2ff}
+  .btn.small{padding:4px 6px;font-size:13px}
+  .btn.kick{background:var(--danger);color:white}
+  .main{display:flex;flex-direction:column;gap:10px}
+  .top{display:flex;justify-content:space-between;gap:12px;align-items:center}
+  .panel{background:var(--panel);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+  .chat-wrap{display:flex;gap:12px;height:calc(100vh - 200px)}
+  .chat{flex:1;display:flex;flex-direction:column}
+  #messages{flex:1;overflow:auto;padding:12px;border-radius:8px;border:1px solid #edf2f7;background:linear-gradient(180deg,#fff,#fbfdff)}
+  .message{margin:6px 0;padding:8px 10px;border-radius:8px;max-width:75%}
+  .msg-me{background:#e6f0ff;align-self:flex-end}
+  .msg-other{background:#f3f4f6;align-self:flex-start}
+  .meta{font-size:11px;color:var(--muted);margin-bottom:4px}
+  .controls{display:flex;gap:8px;align-items:center;margin-top:8px}
+  input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:1}
+  #videos{display:flex;gap:12px;flex-wrap:wrap;padding:8px;border-radius:8px;border:1px dashed #e6eef8;min-height:140px;background:linear-gradient(180deg,#fff,#fbfdff)}
+  .video-container{position:relative;width:260px;height:190px;border-radius:8px;overflow:hidden;background:black;display:flex;align-items:center;justify-content:center}
+  .video-container video{width:100%;height:100%;object-fit:cover}
+  .video-label{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.5);color:white;font-size:12px;padding:4px 6px;border-radius:6px}
+  .video-kick{position:absolute;top:6px;right:6px;display:none}
+  .video-container.admin .video-kick{display:block}
+  #adminPanel{display:none;position:absolute;top:20%;left:50%;transform:translateX(-50%);background:#fff;padding:20px;border-radius:12px;box-shadow:0 6px 20px rgba(2,6,23,.2);z-index:1000}
 </style>
 </head>
 <body>
-
-<!-- Pantalla inicial -->
-<div id="startScreen" class="center-screen">
-  <input id="nicknameInput" type="text" placeholder="Elige tu apodo" />
-  <button id="enterBtn" class="btn">Entrar</button>
-</div>
-
-<div class="app" style="display:none">
+<div class="app">
   <aside class="sidebar panel">
-    <h3>Conectar por apodo</h3>
-    <input id="peerInput" type="text" placeholder="Apodo amigo" style="margin-bottom:8px"/>
-    <button id="connectPeerBtn" class="btn small">Conectar</button>
+    <h3>Amigos conectados</h3>
+    <div class="info" id="sidebarInfo">Conectando...</div>
     <div id="usersList"></div>
-    <div style="margin-top:8px;font-size:13px;color:var(--muted)">
-      <div><strong>Tu apodo:</strong> <span id="meName"></span></div>
-      <div style="margin-top:6px"><strong>ID:</strong> <span id="meId"></span></div>
+    <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+      <input id="friendInput" type="text" placeholder="Apodo amigo" style="flex:1;padding:6px;border-radius:6px;border:1px solid #ccc">
+      <button id="connectFriend" class="btn small">💬 Conectar</button>
     </div>
+    <div style="margin-top:12px;font-size:13px;color:var(--muted)"><div><strong>Tu nombre:</strong> <span id="meName"></span></div><div style="margin-top:6px"><strong>ID:</strong> <span id="meId"></span></div></div>
   </aside>
-
   <main class="main">
-    <div class="panel chat-wrap" style="flex-direction:column;display:flex;gap:8px;">
-      <div id="messages" style="flex:1;overflow:auto;padding:12px;border-radius:8px;border:1px solid #edf2f7;background:linear-gradient(180deg,#fff,#fbfdff)"></div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-        <input id="messageInput" type="text" placeholder="Escribe un mensaje..." />
-        <button id="sendBtn" class="btn">Enviar</button>
+    <div class="top">
+      <h2 style="margin:0">Chat P2P — Moderación y Videollamada</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="inviteAll" class="btn small">📞 Invitar a llamada</button>
       </div>
     </div>
-    <div class="panel">
-      <div id="videos"></div>
-      <button id="startCamBtn" class="btn small">Iniciar cámara</button>
-      <button id="stopCamBtn" class="btn small">Detener cámara</button>
+    <div class="panel chat-wrap">
+      <section class="chat panel" style="flex:1 1 60%">
+        <div id="messages" aria-live="polite"></div>
+        <div class="controls">
+          <input id="messageInput" type="text" placeholder="Escribe un mensaje..." />
+          <button id="sendBtn" class="btn">Enviar</button>
+          <label class="btn small">📁<input id="fileInput" type="file" style="display:none"></label>
+        </div>
+      </section>
+      <aside style="width:420px;display:flex;flex-direction:column;gap:8px">
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:center"><strong>Videollamadas</strong><span class="meta">Activas: <span id="activeCalls">0</span></span></div>
+          <div id="videos"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="startCam" class="btn small">Iniciar cámara</button>
+            <button id="stopCam" class="btn small">Detener cámara</button>
+            <button id="hangupAll" class="btn small">Colgar todo</button>
+          </div>
+        </div>
+      </aside>
     </div>
   </main>
 </div>
 
+<div id="adminPanel">
+  <h3>Panel Admin</h3>
+  <div id="adminList"></div>
+  <button id="closeAdmin" class="btn small">Cerrar</button>
+</div>
+
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-// ---------------------------- Variables ----------------------------
-let userName = '';
-let myId = '';
-let peer = null;
-const dataConns = {};
-const mediaCalls = {};
-const knownPeers = new Set();
-let localStream = null;
-const bannedIPs = {}; // IP / ID -> {until, name}
+/* -------------------- Configuración inicial -------------------- */
+let userName='', myId='';
+let peer=null, dataConns={}, mediaCalls={}, localStream=null;
+let knownPeers=new Set(), banList={}, ipBanList={};
 
-// ---------------------------- UI Refs ----------------------------
-const startScreen = document.getElementById('startScreen');
-const nicknameInput = document.getElementById('nicknameInput');
-const enterBtn = document.getElementById('enterBtn');
-const appDiv = document.querySelector('.app');
-const peerInput = document.getElementById('peerInput');
-const connectPeerBtn = document.getElementById('connectPeerBtn');
-const meNameSpan = document.getElementById('meName');
-const meIdSpan = document.getElementById('meId');
-const usersListDiv = document.getElementById('usersList');
-const messagesDiv = document.getElementById('messages');
-const messageInput = document.getElementById('messageInput');
-const sendBtn = document.getElementById('sendBtn');
-const videosDiv = document.getElementById('videos');
-const startCamBtn = document.getElementById('startCamBtn');
-const stopCamBtn = document.getElementById('stopCamBtn');
-
-// ---------------------------- Funciones básicas ----------------------------
-function initPeer() {
-  peer = new Peer(myId);
-  peer.on('connection', conn => setupDataConn(conn));
-  peer.on('call', async call => {
-    if(bannedIPs[call.peer] && bannedIPs[call.peer].until>Date.now()){ return; }
-    const accept = confirm(`${call.peer.replace('chat-','')} quiere iniciar videollamada. Aceptar?`);
-    if(accept){
-      await ensureLocalStream();
-      call.answer(localStream);
-      mediaCalls[call.peer]=call;
-      call.on('stream', s=>addRemoteVideo(call.peer,s));
-      call.on('close', ()=>removeRemoteVideo(call.peer));
-    }
-  });
-}
-
-function setupDataConn(conn){
-  dataConns[conn.peer]=conn;
-  conn.on('data', d=>handleData(conn.peer,d));
-  conn.on('close', ()=>delete dataConns[conn.peer]);
-  knownPeers.add(conn.peer);
-}
-
-function handleData(peerId, data){
-  if(data.type==='chat'){
-    if(bannedIPs[peerId] && bannedIPs[peerId].until>Date.now()) return;
-    addMessage(`${data.name}: ${data.text}`);
-  } else if(data.type==='startCamRequest'){
-    if(confirm(`${data.name} quiere iniciar videollamada. Aceptar?`)){
-      ensureLocalStream().then(stream=>{
-        startCall(peerId);
-      });
-    }
-  } else if(data.type==='banIP'){
-    const until = Date.now()+data.minutes*60000;
-    bannedIPs[peerId]={until,name:data.name};
-    addMessage(`${data.name} ha sido baneado durante ${data.minutes} minutos`);
-    if(dataConns[peerId]){ try{ dataConns[peerId].close(); }catch(e){} }
-    if(mediaCalls[peerId]){ try{ mediaCalls[peerId].close(); }catch(e){} removeRemoteVideo(peerId);}
-  }
-}
-
-function addMessage(text){
-  const d = document.createElement('div');
-  d.textContent=text;
-  messagesDiv.appendChild(d);
-  messagesDiv.scrollTop=messagesDiv.scrollHeight;
-}
-
-function broadcast(obj){
-  Object.values(dataConns).forEach(c=>{
-    try{ c.send(obj); }catch(e){}
-  });
-}
-
-function ensureLocalStream(){
-  if(localStream) return Promise.resolve(localStream);
-  return navigator.mediaDevices.getUserMedia({video:true,audio:true}).then(stream=>{
-    localStream=stream;
-    addLocalVideo();
-    return stream;
-  });
-}
-
-function addLocalVideo(){
-  const existing=document.getElementById('localVideoContainer');
-  if(existing) existing.remove();
-  const cont=document.createElement('div');
-  cont.id='localVideoContainer';
-  cont.className='video-container';
-  const v=document.createElement('video');
-  v.autoplay=true; v.muted=true; v.playsInline=true; v.srcObject=localStream;
-  cont.appendChild(v);
-  const label=document.createElement('div'); label.className='video-label'; label.textContent='Tú';
-  cont.appendChild(label);
-  videosDiv.prepend(cont);
-}
-
-function addRemoteVideo(pid, stream){
-  if(document.getElementById('video-'+pid)) return;
-  const cont=document.createElement('div');
-  cont.className='video-container'; cont.id='video-'+pid;
-  const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.srcObject=stream;
-  const label=document.createElement('div'); label.className='video-label'; label.textContent=pid.replace('chat-','');
-  cont.appendChild(v); cont.appendChild(label);
-  videosDiv.appendChild(cont);
-}
-
-function removeRemoteVideo(pid){
-  const el=document.getElementById('video-'+pid);
-  if(el) el.remove();
-  if(mediaCalls[pid]) delete mediaCalls[pid];
-}
-
-// ---------------------------- Eventos UI ----------------------------
-enterBtn.onclick = ()=>enterChat();
-nicknameInput.addEventListener('keyup', e=>{ if(e.key==='Enter') enterChat(); });
-
-function enterChat(){
-  let n = nicknameInput.value.trim();
-  if(!n || n.toLowerCase().startsWith('chatuser')){ alert('Debes elegir un apodo válido'); return; }
-  userName=n;
+function askName(){
+  userName = prompt('Elige tu apodo:')||'ChatUser'+Math.floor(Math.random()*1000);
+  if(userName.startsWith('ChatUser')) askName();
   myId='chat-'+userName;
-  meNameSpan.textContent=userName;
-  meIdSpan.textContent=myId;
-  startScreen.style.display='none';
-  appDiv.style.display='grid';
-  initPeer();
+  meName.textContent=userName;
+  meId.textContent=myId;
+}
+askName();
+
+peer = new Peer(myId);
+
+/* -------------------- UI Referencias -------------------- */
+const usersList=document.getElementById('usersList');
+const sidebarInfo=document.getElementById('sidebarInfo');
+const messagesDiv=document.getElementById('messages');
+const messageInput=document.getElementById('messageInput');
+const sendBtn=document.getElementById('sendBtn');
+const fileInput=document.getElementById('fileInput');
+const connCount=document.getElementById('connCount');
+const friendInput=document.getElementById('friendInput');
+const connectFriend=document.getElementById('connectFriend');
+const videosDiv=document.getElementById('videos');
+const startCamBtn=document.getElementById('startCam');
+const stopCamBtn=document.getElementById('stopCam');
+const hangupAllBtn=document.getElementById('hangupAll');
+const activeCallsSpan=document.getElementById('activeCalls');
+
+const adminPanel=document.getElementById('adminPanel');
+const adminList=document.getElementById('adminList');
+const closeAdmin=document.getElementById('closeAdmin');
+
+function stringToColor(str){let h=0;for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i);const hue=Math.abs(h)%360;return `hsl(${hue}deg 70% 45%)`;}
+
+/* -------------------- Mensajes -------------------- */
+function addMessage(text, cls='msg-other'){const div=document.createElement('div');div.className=`message ${cls}`;const meta=document.createElement('div');meta.className='meta';meta.textContent=new Date().toLocaleTimeString();const content=document.createElement('div');content.textContent=text;div.appendChild(meta);div.appendChild(content);messagesDiv.appendChild(div);messagesDiv.scrollTop=messagesDiv.scrollHeight;}
+
+/* -------------------- Renderizado usuarios -------------------- */
+function renderUsers(){
+  usersList.innerHTML='';
+  Array.from(knownPeers).sort().forEach(pid=>{
+    const row=document.createElement('div'); row.className='user-row';
+    const meta=document.createElement('div'); meta.className='user-meta';
+    const avatar=document.createElement('div'); avatar.className='avatar'; avatar.style.background=stringToColor(pid); avatar.textContent=pid.replace('chat-','').slice(0,2).toUpperCase();
+    const txt=document.createElement('div');
+    const nameDiv=document.createElement('div'); nameDiv.className='u-name'; nameDiv.textContent=pid.replace('chat-','');
+    const idDiv=document.createElement('div'); idDiv.className='u-id'; idDiv.textContent=pid;
+    txt.appendChild(nameDiv); txt.appendChild(idDiv);
+    meta.appendChild(avatar); meta.appendChild(txt);
+
+    const actions=document.createElement('div'); actions.className='user-actions';
+    if(pid!==myId){
+      const chatBtn=document.createElement('button'); chatBtn.className='btn small'; chatBtn.textContent='💬'; chatBtn.onclick=()=>connectToPeer(pid);
+      const callBtn=document.createElement('button'); callBtn.className='btn small'; callBtn.textContent='📹'; callBtn.onclick=()=>requestCall(pid);
+      actions.appendChild(chatBtn); actions.appendChild(callBtn);
+    } else { const label=document.createElement('div'); label.className='meta'; label.textContent='(tú)'; actions.appendChild(label); }
+    row.appendChild(meta); row.appendChild(actions); usersList.appendChild(row);
+  });
 }
 
-sendBtn.onclick = ()=>sendMessage();
-messageInput.addEventListener('keyup', e=>{ if(e.key==='Enter') sendMessage(); });
+/* -------------------- Conexiones -------------------- */
+function connectToPeer(pid){
+  if(ipBanList[pid] && ipBanList[pid]>Date.now()){ alert(pid.replace('chat-','')+' está baneado temporalmente durante '+Math.ceil((ipBanList[pid]-Date.now())/1000)+'s'); return; }
+  if(dataConns[pid]) return dataConns[pid];
+  const conn=peer.connect(pid,{reliable:true});
+  conn.on('open',()=>setupConn(conn));
+  conn.on('error',err=>console.warn(err));
+  return conn;
+}
 
+function setupConn(conn){
+  dataConns[conn.peer]=conn;
+  try{conn.send({type:'join',id:myId,name:userName});}catch(e){}
+  conn.on('data',data=>handleData(conn.peer,data));
+  conn.on('close',()=>{delete dataConns[conn.peer]; knownPeers.delete(conn.peer); renderUsers();});
+  knownPeers.add(conn.peer); renderUsers();
+}
+
+peer.on('connection',conn=>{setupConn(conn); conn.on('open',()=>{try{conn.send({type:'join',id:myId,name:userName});}catch(e){}});});
+peer.on('open',id=>{sidebarInfo.textContent='Conectado al servidor PeerJS'; knownPeers.add(myId); renderUsers();});
+peer.on('error',e=>console.error(e));
+
+/* -------------------- Manejo de mensajes -------------------- */
+function handleData(from,data){
+  if(!data||typeof data!=='object')return;
+  if(data.type==='join'){knownPeers.add(data.id); renderUsers();}
+  else if(data.type==='chat'){addMessage(data.name+': '+data.text,'msg-other'); if(data.text.startsWith('/admintools0011') && myId===data.from){showAdmin();}}
+  else if(data.type==='tempBanIP'){ipBanList[data.target]=data.until; if(data.target===myId){addMessage('⛔ Has sido baneado temporalmente hasta '+new Date(data.until).toLocaleTimeString());}}
+  else if(data.type==='callRequest'){handleCallRequest(from);}
+  else if(data.type==='callAccepted'){startCall(from);}
+}
+
+/* -------------------- Enviar mensaje -------------------- */
+function broadcast(obj){Object.keys(dataConns).forEach(k=>{try{dataConns[k].send(obj);}catch(e){}});}
+sendBtn.onclick=sendMessage;
+messageInput.addEventListener('keyup',e=>{if(e.key==='Enter')sendMessage();});
 function sendMessage(){
-  const t = messageInput.value.trim(); if(!t) return;
-  messageInput.value='';
-  if(t==='/admintools0011'){ alert('Panel Admin'); return; }
-  broadcast({type:'chat',name:userName,text:t});
-  addMessage('Tú: '+t);
+  const t=messageInput.value.trim(); if(!t)return;
+  if(t==='/admintools0011'){showAdmin(); messageInput.value=''; return;}
+  broadcast({type:'chat',name:userName,text:t,from:myId}); addMessage('Tú: '+t,'msg-me'); messageInput.value='';
 }
 
-connectPeerBtn.onclick=()=>connectToFriend();
-peerInput.addEventListener('keyup', e=>{ if(e.key==='Enter') connectToFriend(); });
-
-function connectToFriend(){
-  const nick = peerInput.value.trim(); if(!nick) return;
-  peerInput.value='';
-  const pid = 'chat-'+nick;
-  if(bannedIPs[pid] && bannedIPs[pid].until>Date.now()){
-    const mins = Math.ceil((bannedIPs[pid].until-Date.now())/60000);
-    alert(`Error: no ha sido posible conectarte con ${nick}, permanece baneado por ${mins} minutos`);
-    return;
-  }
-  if(!dataConns[pid]) peer.connect(pid).on('open', conn=>setupDataConn(conn));
+/* -------------------- Agregar amigos -------------------- */
+connectFriend.onclick=addFriend;
+friendInput.addEventListener('keyup',e=>{if(e.key==='Enter')addFriend();});
+function addFriend(){
+  const ap=friendInput.value.trim(); if(!ap)return; friendInput.value='';
+  const pid='chat-'+ap;
+  if(ipBanList[pid] && ipBanList[pid]>Date.now()){ alert(ap+' está baneado temporalmente durante '+Math.ceil((ipBanList[pid]-Date.now())/1000)+'s'); return; }
+  connectToPeer(pid);
 }
 
-// ---------------------------- Videollamada ----------------------------
-startCamBtn.onclick=()=>{
-  Object.keys(dataConns).forEach(pid=>{
-    try{ dataConns[pid].send({type:'startCamRequest',name:userName}); }catch(e){}
-  });
-  ensureLocalStream().then(()=>{ Object.keys(dataConns).forEach(pid=>startCall(pid)); });
-};
+/* -------------------- Videollamada -------------------- */
+async function ensureLocalStream(){if(localStream)return localStream; try{localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); addLocalVideo(); return localStream;}catch(e){alert('No se pudo acceder a cámara/micro'); throw e;}}
+function addLocalVideo(){if(document.getElementById('localVideoContainer'))document.getElementById('localVideoContainer').remove(); const cont=document.createElement('div'); cont.id='localVideoContainer'; cont.className='video-container'; const v=document.createElement('video'); v.autoplay=true; v.muted=true; v.playsInline=true; v.srcObject=localStream; cont.appendChild(v); const label=document.createElement('div'); label.className='video-label'; label.textContent='Tú'; videosDiv.prepend(cont);}
+function createRemoteVideo(pid,stream){if(document.getElementById('video-'+pid))return; const cont=document.createElement('div'); cont.className='video-container'; cont.id='video-'+pid; const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.srcObject=stream; const label=document.createElement('div'); label.className='video-label'; label.textContent=pid.replace('chat-',''); cont.appendChild(v); videosDiv.appendChild(cont);}
+function removeRemoteVideo(pid){const el=document.getElementById('video-'+pid); if(el)el.remove(); if(mediaCalls[pid])delete mediaCalls[pid]; activeCallsUpdate();}
+function activeCallsUpdate(){activeCallsSpan.textContent=String(Object.keys(mediaCalls).length);}
+async function requestCall(pid){if(confirm('Solicitar videollamada a '+pid.replace('chat-','')+'?')){connectToPeer(pid); dataConns[pid].send({type:'callRequest'});}
+}
+async function handleCallRequest(from){if(confirm(from.replace('chat-','')+' solicita videollamada. Aceptar?')){connectToPeer(from); dataConns[from].send({type:'callAccepted'}); startCall(from);}}
+async function startCall(pid){await ensureLocalStream(); try{const call=peer.call(pid,localStream); mediaCalls[pid]=call; activeCallsUpdate(); call.on('stream',stream=>createRemoteVideo(pid,stream)); call.on('close',()=>removeRemoteVideo(pid));}catch(e){console.warn('call error',e);}}
+peer.on('call',async call=>{await ensureLocalStream(); call.answer(localStream); mediaCalls[call.peer]=call; call.on('stream',stream=>createRemoteVideo(call.peer,stream)); call.on('close',()=>removeRemoteVideo(call.peer));});
+hangupAllBtn.onclick=()=>{Object.keys(mediaCalls).forEach(pid=>{try{mediaCalls[pid].close();}catch(e){} removeRemoteVideo(pid);});}
 
-stopCamBtn.onclick=()=>{
-  if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; const el=document.getElementById('localVideoContainer'); if(el) el.remove(); }
-};
+/* -------------------- Panel Admin -------------------- */
+function showAdmin(){adminPanel.style.display='block'; renderAdmin();}
+closeAdmin.onclick=()=>{adminPanel.style.display='none';}
+function renderAdmin(){adminList.innerHTML=''; knownPeers.forEach(pid=>{if(pid===myId)return; const row=document.createElement('div'); row.style.display='flex'; row.style.gap='8px'; const label=document.createElement('span'); label.textContent=pid.replace('chat-',''); const tempBan=document.createElement('button'); tempBan.textContent='TempBanIP'; tempBan.className='btn small kick'; tempBan.onclick=()=>tempBanUser(pid); row.appendChild(label); row.appendChild(tempBan); adminList.appendChild(row);});}
 
-function startCall(pid){
-  ensureLocalStream().then(stream=>{
-    const call=peer.call(pid,stream);
-    mediaCalls[pid]=call;
-    call.on('stream', s=>addRemoteVideo(pid,s));
-    call.on('close', ()=>removeRemoteVideo(pid));
-  });
+function tempBanUser(pid){
+  const mins=prompt('Minutos de baneo','1'); if(!mins)return; const until=Date.now()+parseInt(mins)*60000;
+  ipBanList[pid]=until; broadcast({type:'tempBanIP',target:pid,until}); addMessage(`⛔ ${pid.replace('chat-','')} ha sido baneado temporalmente hasta ${new Date(until).toLocaleTimeString()}`);
+  if(dataConns[pid]){dataConns[pid].send({type:'tempBanIP',target:pid,until}); dataConns[pid].close(); delete dataConns[pid]; knownPeers.delete(pid); renderUsers();}
 }
 
+/* -------------------- TempBan cuenta regresiva -------------------- */
+setInterval(()=>{
+  const now=Date.now();
+  Object.keys(ipBanList).forEach(pid=>{if(ipBanList[pid]<=now){delete ipBanList[pid]; addMessage(pid.replace('chat-','')+' se ha unido tras cumplir su baneo');}});},1000);
+
+/* -------------------- Inicialización -------------------- */
+renderUsers();
 </script>
 </body>
 </html>
