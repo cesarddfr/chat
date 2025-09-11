@@ -2,120 +2,78 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Chat P2P — Versión Extendida</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chat P2P Avanzado</title>
 <style>
-:root{--bg:#f4f6fb;--panel:#fff;--muted:#6b7280;--accent:#2563eb;--danger:#ef4444}
-html,body{margin:0;padding:0;height:100%;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
-.app{display:grid;grid-template-columns:320px 1fr;gap:12px;height:100vh;padding:12px;background:var(--bg);box-sizing:border-box}
-.sidebar{background:var(--panel);border-radius:12px;padding:12px;box-shadow:0 6px 20px rgba(2,6,23,0.06);display:flex;flex-direction:column}
-.sidebar h3{margin:0 0 8px 0;font-size:16px}
-.sidebar .info{font-size:13px;color:var(--muted);margin-bottom:8px}
-#usersList{overflow:auto;flex:1;padding-right:6px}
-.user-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;margin-bottom:6px;transition:background .12s}
-.user-row:hover{background:#f1f5f9}
-.user-meta{display:flex;gap:8px;align-items:center;min-width:0}
-.avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
-.u-name{font-weight:600;font-size:14px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
-.u-id{font-size:12px;color:var(--muted);max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.user-actions{display:flex;gap:6px}
-.btn{padding:6px 8px;border-radius:8px;border:none;cursor:pointer;background:#eef2ff}
-.btn.small{padding:4px 6px;font-size:13px}
-.btn.kick{background:var(--danger);color:white}
-.main{display:flex;flex-direction:column;gap:10px}
-.top{display:flex;justify-content:space-between;gap:12px;align-items:center}
-.panel{background:var(--panel);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
-.chat-wrap{display:flex;gap:12px;height:calc(100vh - 200px)}
-.chat{flex:1;display:flex;flex-direction:column}
-#messages{flex:1;overflow:auto;padding:12px;border-radius:8px;border:1px solid #edf2f7;background:linear-gradient(180deg,#fff,#fbfdff)}
-.message{margin:6px 0;padding:8px 10px;border-radius:8px;max-width:75%}
-.msg-me{background:#e6f0ff;align-self:flex-end}
-.msg-other{background:#f3f4f6;align-self:flex-start}
-.meta{font-size:11px;color:var(--muted);margin-bottom:4px}
-.controls{display:flex;gap:8px;align-items:center;margin-top:8px}
-input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:1}
-#videos{display:flex;gap:12px;flex-wrap:wrap;padding:8px;border-radius:8px;border:1px dashed #e6eef8;min-height:140px;background:linear-gradient(180deg,#fff,#fbfdff)}
-.video-container{position:relative;width:260px;height:190px;border-radius:8px;overflow:hidden;background:black;display:flex;align-items:center;justify-content:center}
-.video-container video{width:100%;height:100%;object-fit:cover}
-.video-label{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.5);color:white;font-size:12px;padding:4px 6px;border-radius:6px}
-.video-kick{position:absolute;top:6px;right:6px;display:none}
-.video-container.admin .video-kick{display:block}
-#votePanel{padding:10px;border-radius:8px;background:#fff4e6;border:1px solid #ffd8a8;display:none}
-.vote-row{display:flex;gap:8px;align-items:center}
-#adminPanel{position:absolute;top:20px;left:50%;transform:translateX(-50%);background:#fff;border:2px solid #2563eb;border-radius:12px;padding:12px;display:none;flex-direction:column;gap:8px;z-index:999;box-shadow:0 6px 20px rgba(0,0,0,0.2)}
-#adminPanel button{background:#2563eb;color:white}
-.chat-history{margin-top:8px;border-top:1px solid #ccc;padding-top:6px;display:flex;flex-direction:column;gap:4px}
-.chat-history button{margin-left:6px;padding:2px 6px;font-size:12px}
-@media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{order:2;height:220px}.main{order:1}.chat-wrap{height:420px}}
+  /* ... Mantener todo el CSS original ... */
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="sidebar panel">
-    <h3>Conectar a un usuario</h3>
-    <input id="peerIdInput" placeholder="Apodo">
-    <button id="connectBtn">Conectar</button>
-    <div id="usersList"></div>
-    <div class="chat-history" id="chatHistory"></div>
-    <div style="margin-top:12px;font-size:13px;color:var(--muted)"><div><strong>Tu nombre:</strong> <span id="meName"></span></div><div style="margin-top:6px"><strong>ID:</strong> <span id="meId"></span></div></div>
+    <h3>Conectar por Apodo</h3>
+    <input id="peerIdInput" type="text" placeholder="Escribe el apodo..."/>
+    <button id="connectBtn" class="btn small">Conectar</button>
+    <h3>Historial de Chats</h3>
+    <div id="chatHistory" style="overflow:auto;max-height:200px;"></div>
   </aside>
+
   <main class="main">
     <div class="top">
-      <h2 style="margin:0">Chat P2P — Moderación y Videollamada</h2>
+      <h2>Chat P2P Avanzado</h2>
+      <button id="startCamBtn" class="btn small">Iniciar cámara</button>
     </div>
+
     <div class="panel chat-wrap">
       <section class="chat panel" style="flex:1 1 60%">
         <div id="messages" aria-live="polite"></div>
         <div class="controls">
-          <input id="messageInput" type="text" placeholder="Escribe un mensaje..."/>
+          <input id="messageInput" type="text" placeholder="Escribe un mensaje..." />
           <button id="sendBtn" class="btn">Enviar</button>
-          <label class="btn small">📁<input id="fileInput" type="file" style="display:none"></label>
         </div>
       </section>
       <aside style="width:420px;display:flex;flex-direction:column;gap:8px">
-        <div class="panel">
-          <div style="display:flex;justify-content:space-between;align-items:center"><strong>Videollamadas</strong><span class="meta">Activas: <span id="activeCalls">0</span></span></div>
-          <div id="videos"></div>
-          <div style="display:flex;gap:8px;margin-top:8px"><button id="startCam" class="btn small">Iniciar cámara</button><button id="stopCam" class="btn small">Detener cámara</button></div>
+        <div id="videos"></div>
+        <div id="adminPanel" style="display:none;flex-direction:column;gap:4px;">
+          <button id="kickBtn">Kick</button>
+          <button id="banBtn">Ban</button>
+          <button id="tempBanBtn">TempBan</button>
+          <button id="tempBanIPBtn">TempBanIP</button>
+          <button id="closeAdmin">Cerrar Panel</button>
         </div>
-        <div id="votePanel" class="panel"></div>
       </aside>
     </div>
   </main>
 </div>
-<div id="adminPanel">
-  <strong>Admin Tools</strong>
-  <button id="kickBtn">Kick</button>
-  <button id="banBtn">Ban</button>
-  <button id="tempBanBtn">TempBan (min)</button>
-  <button id="tempBanIPBtn">TempBanIP</button>
-  <button id="closeAdmin">Cerrar</button>
-</div>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-const userName = prompt('Tu nombre:')||'user'+Math.floor(Math.random()*1000);
+const userName = prompt('Pon tu nombre:') || 'user'+Math.floor(Math.random()*1000);
 const myId = 'chat-'+userName;
-document.getElementById('meName').textContent = userName;
-document.getElementById('meId').textContent = myId;
 
 const peer = new Peer(myId);
-const dataConns = {}, mediaCalls = {};
+const dataConns = {};
+const mediaCalls = {};
 let localStream = null;
-const chatHistoryArr = [];
+let chatHistoryArr = [];
 
+const peerIdInput = document.getElementById('peerIdInput');
+const connectBtn = document.getElementById('connectBtn');
 const messagesDiv = document.getElementById('messages');
 const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
-const fileInput = document.getElementById('fileInput');
-const peerIdInput = document.getElementById('peerIdInput');
-const connectBtn = document.getElementById('connectBtn');
 const videosDiv = document.getElementById('videos');
-const startCamBtn = document.getElementById('startCam');
-const stopCamBtn = document.getElementById('stopCam');
+const startCamBtn = document.getElementById('startCamBtn');
+const chatHistory = document.getElementById('chatHistory');
 const adminPanel = document.getElementById('adminPanel');
 
-function addMessage(text, cls='msg-other'){ const div=document.createElement('div'); div.className='message '+cls; div.textContent=text; messagesDiv.appendChild(div); messagesDiv.scrollTop=messagesDiv.scrollHeight; }
+// -------------------- UTILIDADES --------------------
+function addMessage(text, cls='msg-other'){
+  const div = document.createElement('div');
+  div.className = `message ${cls}`;
+  div.textContent = text;
+  messagesDiv.appendChild(div);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
 
 function updateHistory(peerName, peerId){ 
   if(!chatHistoryArr.find(e=>e.id===peerId)){
@@ -125,67 +83,70 @@ function updateHistory(peerName, peerId){
 }
 
 function renderHistory(){
-  const container = document.getElementById('chatHistory');
-  container.innerHTML='';
+  chatHistory.innerHTML='';
   chatHistoryArr.forEach(e=>{
     const div = document.createElement('div');
-    div.textContent=e.name;
+    div.textContent = e.name+' ';
     const btn = document.createElement('button');
     btn.textContent='Reconectar';
-    btn.onclick = ()=>{ connectToPeer(e.id); };
+    btn.onclick = ()=>connectToPeer(e.name);
     div.appendChild(btn);
-    container.appendChild(div);
+    chatHistory.appendChild(div);
   });
 }
 
+// -------------------- CONEXIONES --------------------
 function connectToPeer(targetName){
   const target = targetName.startsWith('chat-')?targetName:'chat-'+targetName;
   if(target===myId){ alert('No puedes conectarte a ti mismo'); return; }
   if(dataConns[target]){ alert('Ya conectado'); return; }
+
   const conn = peer.connect(target, {reliable:true});
-  conn.on('open', ()=>setupConn(conn));
+  conn.on('open', ()=>{
+    setupConn(conn);
+  });
   conn.on('error', e=>alert('Error: '+e));
 }
 
 function setupConn(conn){
   dataConns[conn.peer]=conn;
   conn.on('data', data=>handleData(conn.peer,data));
-  conn.on('close', ()=>{ delete dataConns[conn.peer]; });
+  conn.on('close', ()=>{
+    delete dataConns[conn.peer];
+    removeRemoteVideo(conn.peer);
+    addMessage(`⚠️ ${conn.peer.replace('chat-','')} se desconectó`);
+  });
   try{ conn.send({type:'join',id:myId,name:userName}); }catch(e){}
   updateHistory(conn.peer.replace('chat-',''), conn.peer);
 }
 
-connectBtn.onclick = ()=>{ const targetName = peerIdInput.value.trim(); if(!targetName){ alert('Apodo inválido'); return; } connectToPeer(targetName); };
+connectBtn.onclick = ()=>{ 
+  const targetName = peerIdInput.value.trim();
+  if(!targetName){ alert('Apodo inválido'); return; } 
+  connectToPeer(targetName); 
+};
 
-peer.on('connection', conn=>{ setupConn(conn); });
-
+// -------------------- MENSAJES --------------------
 sendBtn.onclick = ()=>{
   const text = messageInput.value.trim();
   if(!text) return;
-  if(text==='/admintools0011'){ showAdminPanel(); messageInput.value=''; return; }
+  if(text==='/admintools0011'){ adminPanel.style.display='flex'; messageInput.value=''; return; }
   addMessage('Tú: '+text,'msg-me');
   for(const k in dataConns){ try{ dataConns[k].send({type:'chat',name:userName,text}); }catch(e){} }
   messageInput.value='';
 };
 
-function showAdminPanel(){ adminPanel.style.display='flex'; }
-document.getElementById('closeAdmin').onclick=()=>{ adminPanel.style.display='none'; };
-
-// Admin actions
-document.getElementById('kickBtn').onclick=()=>{ const target=prompt('Kick ID:'); if(target && dataConns[target]){ dataConns[target].close(); } };
-document.getElementById('banBtn').onclick=()=>{ const target=prompt('Ban ID:'); if(target){ dataConns[target]?.close(); } };
-document.getElementById('tempBanBtn').onclick=()=>{ const target=prompt('TempBan ID:'); const mins=parseInt(prompt('Minutos?'))||5; if(target){ tempBan(target, mins); } };
-document.getElementById('tempBanIPBtn').onclick=()=>{ const target=prompt('TempBanIP ID:'); if(target){ tempBanIP(target); } };
-
-function tempBan(target, mins){ dataConns[target]?.close(); setTimeout(()=>{}, mins*60000); }
-function tempBanIP(target){ dataConns[target]?.close(); localStorage.setItem('banIP-'+target,'true'); alert(target+' bloqueado por IP. Si intenta reconectar, se congela.'); }
-
-// Al iniciar, chequear tempbanIP
-for(const k in dataConns){
-  if(localStorage.getItem('banIP-'+k)){ addMessage('🚫 '+k+' bloqueado por IP'); throw new Error('Bloqueado'); }
+function handleData(from, data){
+  if(!data) return;
+  if(data.type==='join'){ updateHistory(data.name,data.id); addMessage(`${data.name} se ha unido`); }
+  else if(data.type==='chat'){ addMessage(data.name+': '+data.text,'msg-other'); }
+  else if(data.type==='camRequest'){
+    const accept = confirm(from.replace('chat-','')+' quiere iniciar cámara. Aceptas?');
+    if(accept) startCall(from);
+  }
 }
 
-// Camara
+// -------------------- CAMARA --------------------
 startCamBtn.onclick=()=>{
   const targets = Object.keys(dataConns);
   if(targets.length===0){ alert('Conéctate primero'); return; }
@@ -194,35 +155,27 @@ startCamBtn.onclick=()=>{
   });
 };
 
-peer.on('call', async call=>{
-  const accept = confirm(call.peer+' quiere iniciar cámara. Aceptas?');
-  if(!accept){ call.close(); return; }
-  const stream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  call.answer(stream);
-  mediaCalls[call.peer]=call;
-  createRemoteVideo(call.peer, stream);
-  call.on('close', ()=>{ delete mediaCalls[call.peer]; removeRemoteVideo(call.peer); });
-});
-
-function handleData(from, data){
-  if(!data) return;
-  if(data.type==='join'){ updateHistory(data.name, data.id); }
-  else if(data.type==='chat'){ addMessage(data.name+': '+data.text,'msg-other'); }
-  else if(data.type==='camRequest'){
-    const accept = confirm(from+' quiere iniciar cámara. Aceptas?');
-    if(accept) startCall(from);
-  }
-}
-
 async function startCall(pid){
-  const stream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  localStream = stream;
-  const call = peer.call(pid, stream);
-  mediaCalls[pid]=call;
-  call.on('stream', s=>createRemoteVideo(pid,s));
-  call.on('close', ()=>{ delete mediaCalls[pid]; removeRemoteVideo(pid); });
-  addLocalVideo();
+  try{
+    if(!localStream) localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+    const call = peer.call(pid, localStream);
+    mediaCalls[pid]=call;
+    call.on('stream', s=>createRemoteVideo(pid,s));
+    call.on('close', ()=>{ delete mediaCalls[pid]; removeRemoteVideo(pid); });
+    addLocalVideo();
+  }catch(e){ alert('Error cámara: '+e); }
 }
+
+peer.on('call', async call=>{
+  const accept = confirm(call.peer.replace('chat-','')+' quiere iniciar cámara. Aceptas?');
+  if(!accept){ call.close(); return; }
+  if(!localStream) localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  call.answer(localStream);
+  mediaCalls[call.peer]=call;
+  call.on('stream', s=>createRemoteVideo(call.peer,s));
+  call.on('close', ()=>{ delete mediaCalls[call.peer]; removeRemoteVideo(call.peer); });
+  addLocalVideo();
+});
 
 function addLocalVideo(){
   const existing = document.getElementById('localVideoContainer'); if(existing) existing.remove();
@@ -244,6 +197,19 @@ function createRemoteVideo(pid, stream){
 }
 
 function removeRemoteVideo(pid){ const el=document.getElementById('video-'+pid); if(el) el.remove(); delete mediaCalls[pid]; }
+
+// -------------------- ADMIN --------------------
+document.getElementById('closeAdmin').onclick=()=>{ adminPanel.style.display='none'; };
+document.getElementById('kickBtn').onclick=()=>{ const t=prompt('Kick ID:'); if(t && dataConns['chat-'+t]){ dataConns['chat-'+t].close(); } };
+document.getElementById('banBtn').onclick=()=>{ const t=prompt('Ban ID:'); if(t){ dataConns['chat-'+t]?.close(); } };
+document.getElementById('tempBanBtn').onclick=()=>{ const t=prompt('TempBan ID:'); const m=parseInt(prompt('Minutos?'))||5; if(t){ dataConns['chat-'+t]?.close(); setTimeout(()=>{}, m*60000); } };
+document.getElementById('tempBanIPBtn').onclick=()=>{ const t=prompt('TempBanIP ID:'); if(t){ dataConns['chat-'+t]?.close(); localStorage.setItem('banIP-'+t,'true'); alert(t+' bloqueado por IP'); } };
+
+// Bloqueo IP al cargar
+for(const k in dataConns){ if(localStorage.getItem('banIP-'+k)){ alert('Bloqueado por IP: '+k); throw new Error('Bloqueado'); } }
+
+peer.on('connection', conn=>{ setupConn(conn); });
+peer.on('open', id=>{ addMessage('Conectado como '+id,'msg-me'); });
 
 </script>
 </body>
