@@ -41,6 +41,13 @@
   .video-kick{position:absolute;top:6px;right:6px;display:none}
   .video-container.admin .video-kick{display:block}
   #adminPanel{display:none;position:absolute;top:20%;left:50%;transform:translateX(-50%);background:#fff;padding:20px;border-radius:12px;box-shadow:0 6px 20px rgba(2,6,23,.2);z-index:1000}
+  /* Modal nickname */
+  #nameModal{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:2000}
+  #nameModal .box{background:#000;color:#fff;padding:24px;border-radius:10px;min-width:300px;text-align:center}
+  #nameModal input{width:100%;padding:10px;border-radius:8px;border:1px solid #333;margin-top:12px;background:#111;color:#fff}
+  #nameModal button{margin-top:10px;padding:8px 12px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+  /* file link */
+  .file-link{color:var(--accent);text-decoration:underline;cursor:pointer}
 </style>
 </head>
 <body>
@@ -92,32 +99,29 @@
   <button id="closeAdmin" class="btn small">Cerrar</button>
 </div>
 
+<!-- Modal para nombre -->
+<div id="nameModal">
+  <div class="box">
+    <h3>Ingresa tu apodo</h3>
+    <input id="nameInput" type="text" placeholder="Tu apodo...">
+    <button id="nameSubmit">Entrar</button>
+  </div>
+</div>
+
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-/* -------------------- Configuración inicial -------------------- */
+/* -------------------- Variables globales -------------------- */
 let userName='', myId='';
 let peer=null, dataConns={}, mediaCalls={}, localStream=null;
-let knownPeers=new Set(), banList={}, ipBanList={};
+let knownPeers=new Set(), ipBanList={}, bannedPeersCache=new Set();
 
-function askName(){
-  userName = prompt('Elige tu apodo:')||'ChatUser'+Math.floor(Math.random()*1000);
-  if(userName.startsWith('ChatUser')) askName();
-  myId='chat-'+userName;
-  meName.textContent=userName;
-  meId.textContent=myId;
-}
-askName();
-
-peer = new Peer(myId);
-
-/* -------------------- UI Referencias -------------------- */
+/* -------------------- Elementos UI -------------------- */
 const usersList=document.getElementById('usersList');
 const sidebarInfo=document.getElementById('sidebarInfo');
 const messagesDiv=document.getElementById('messages');
 const messageInput=document.getElementById('messageInput');
 const sendBtn=document.getElementById('sendBtn');
 const fileInput=document.getElementById('fileInput');
-const connCount=document.getElementById('connCount');
 const friendInput=document.getElementById('friendInput');
 const connectFriend=document.getElementById('connectFriend');
 const videosDiv=document.getElementById('videos');
@@ -130,10 +134,19 @@ const adminPanel=document.getElementById('adminPanel');
 const adminList=document.getElementById('adminList');
 const closeAdmin=document.getElementById('closeAdmin');
 
+const nameModal=document.getElementById('nameModal');
+const nameInput=document.getElementById('nameInput');
+const nameSubmit=document.getElementById('nameSubmit');
+
 function stringToColor(str){let h=0;for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i);const hue=Math.abs(h)%360;return `hsl(${hue}deg 70% 45%)`;}
 
-/* -------------------- Mensajes -------------------- */
-function addMessage(text, cls='msg-other'){const div=document.createElement('div');div.className=`message ${cls}`;const meta=document.createElement('div');meta.className='meta';meta.textContent=new Date().toLocaleTimeString();const content=document.createElement('div');content.textContent=text;div.appendChild(meta);div.appendChild(content);messagesDiv.appendChild(div);messagesDiv.scrollTop=messagesDiv.scrollHeight;}
+/* -------------------- Mensajes UI -------------------- */
+function addMessage(text, cls='msg-other'){
+  const div=document.createElement('div');div.className=`message ${cls}`;
+  const meta=document.createElement('div');meta.className='meta';meta.textContent=new Date().toLocaleTimeString();
+  const content=document.createElement('div');content.innerHTML=text;
+  div.appendChild(meta);div.appendChild(content);messagesDiv.appendChild(div);messagesDiv.scrollTop=messagesDiv.scrollHeight;
+}
 
 /* -------------------- Renderizado usuarios -------------------- */
 function renderUsers(){
@@ -158,10 +171,53 @@ function renderUsers(){
   });
 }
 
-/* -------------------- Conexiones -------------------- */
+/* -------------------- Inicializar Peer (después de elegir nombre) -------------------- */
+function initPeer(){
+  if(peer) return;
+  peer = new Peer(myId);
+  peer.on('connection',conn=>{
+    setupConn(conn);
+    conn.on('open',()=>{ try{conn.send({type:'join',id:myId,name:userName});}catch(e){} });
+  });
+  peer.on('open',id=>{
+    sidebarInfo.textContent='Conectado al servidor PeerJS';
+    knownPeers.add(myId); renderUsers();
+    addMessage('🔌 Conectado como '+userName+' ('+myId+')','msg-me');
+  });
+  peer.on('error',e=>console.error(e));
+
+  // Llamadas entrantes: si otro nos llama, respondemos con lo que tengamos (si tenemos).
+  peer.on('call',async call=>{
+    // si el que llama está baneado, ignoramos
+    if(isBanned(call.peer)){ try{call.close();}catch(e){} return; }
+    // Si tenemos stream (ya iniciada), respondemos con ella.
+    if(localStream){
+      call.answer(localStream);
+      mediaCalls[call.peer]=call; activeCallsUpdate();
+      call.on('stream',stream=>createRemoteVideo(call.peer,stream));
+      call.on('close',()=>removeRemoteVideo(call.peer));
+    } else {
+      // Preguntar si aceptar y luego obtener stream y llamar de vuelta (seguir flujo de callRequest)
+      if(confirm(call.peer.replace('chat-','')+' te está llamando. ¿Aceptar y activar cámara?')){
+        try{
+          await ensureLocalStream();
+          call.answer(localStream);
+          mediaCalls[call.peer]=call; activeCallsUpdate();
+          call.on('stream',stream=>createRemoteVideo(call.peer,stream));
+          call.on('close',()=>removeRemoteVideo(call.peer));
+        }catch(e){ console.warn('No pudo responder a llamada entrante',e); }
+      } else {
+        try{call.close();}catch(e){}
+      }
+    }
+  });
+}
+
+/* -------------------- Conexiones (data) -------------------- */
 function connectToPeer(pid){
   if(ipBanList[pid] && ipBanList[pid]>Date.now()){ alert(pid.replace('chat-','')+' está baneado temporalmente durante '+Math.ceil((ipBanList[pid]-Date.now())/1000)+'s'); return; }
   if(dataConns[pid]) return dataConns[pid];
+  if(!peer){ initPeer(); }
   const conn=peer.connect(pid,{reliable:true});
   conn.on('open',()=>setupConn(conn));
   conn.on('error',err=>console.warn(err));
@@ -170,77 +226,349 @@ function connectToPeer(pid){
 
 function setupConn(conn){
   dataConns[conn.peer]=conn;
-  try{conn.send({type:'join',id:myId,name:userName});}catch(e){}
+  try{ conn.send({type:'join',id:myId,name:userName}); }catch(e){}
   conn.on('data',data=>handleData(conn.peer,data));
-  conn.on('close',()=>{delete dataConns[conn.peer]; knownPeers.delete(conn.peer); renderUsers();});
+  conn.on('close',()=>{ delete dataConns[conn.peer]; knownPeers.delete(conn.peer); renderUsers(); });
   knownPeers.add(conn.peer); renderUsers();
 }
 
-peer.on('connection',conn=>{setupConn(conn); conn.on('open',()=>{try{conn.send({type:'join',id:myId,name:userName});}catch(e){}});});
-peer.on('open',id=>{sidebarInfo.textContent='Conectado al servidor PeerJS'; knownPeers.add(myId); renderUsers();});
-peer.on('error',e=>console.error(e));
+/* -------------------- Manejo mensajes/data general -------------------- */
+function isBanned(pid){
+  return ipBanList[pid] && ipBanList[pid] > Date.now();
+}
 
-/* -------------------- Manejo de mensajes -------------------- */
 function handleData(from,data){
-  if(!data||typeof data!=='object')return;
-  if(data.type==='join'){knownPeers.add(data.id); renderUsers();}
-  else if(data.type==='chat'){addMessage(data.name+': '+data.text,'msg-other'); if(data.text.startsWith('/admintools0011') && myId===data.from){showAdmin();}}
-  else if(data.type==='tempBanIP'){ipBanList[data.target]=data.until; if(data.target===myId){addMessage('⛔ Has sido baneado temporalmente hasta '+new Date(data.until).toLocaleTimeString());}}
-  else if(data.type==='callRequest'){handleCallRequest(from);}
-  else if(data.type==='callAccepted'){startCall(from);}
+  // Ignorar origen no válido
+  if(!data||typeof data!=='object') return;
+  // Si remitente está baneado, ignorar sus mensajes (para que baneo temporal le impida hablar)
+  if(isBanned(from)){
+    // opcional: informar en consola y evitar procesar
+    console.warn('Mensaje ignorado de '+from+' (baneado)'); 
+    return;
+  }
+
+  switch(data.type){
+    case 'join':
+      knownPeers.add(data.id); renderUsers(); break;
+    case 'chat':
+      // si el remitente está baneado, lo ignoramos.
+      if(isBanned(data.from || from)){ return; }
+      addMessage((data.name?data.name:from.replace('chat-',''))+': '+escapeHtml(data.text),'msg-other');
+      // Mostrar panel admin si comando /banear entrado por quien sea
+      if(typeof data.text === 'string' && data.text.trim()==='/banear' && (data.from===myId || from===myId)){
+        showAdmin();
+      }
+      break;
+    case 'tempBanIP':
+      ipBanList[data.target]=data.until;
+      addMessage('⛔ '+data.target.replace('chat-','')+' baneado hasta '+new Date(data.until).toLocaleTimeString());
+      // Si me banearon, notificarme
+      if(data.target===myId){ addMessage('⛔ Has sido baneado temporalmente hasta '+new Date(data.until).toLocaleTimeString()); }
+      break;
+    case 'callRequest':
+      // Si me solicitan llamada: si tengo stream, hago call de vuelta para que quien solicitó reciba mi cámara (evita pedir permiso al solicitante).
+      handleCallRequest(from);
+      break;
+    case 'callAccepted':
+      // Este flujo ya no se usa extensivamente, pero mantenemos compatibilidad
+      startCall(from);
+      break;
+    case 'file':
+      receiveFile(data);
+      break;
+    default:
+      console.log('data no manejada',data);
+  }
 }
 
-/* -------------------- Enviar mensaje -------------------- */
-function broadcast(obj){Object.keys(dataConns).forEach(k=>{try{dataConns[k].send(obj);}catch(e){}});}
+/* -------------------- Envío broadcast / util -------------------- */
+function broadcast(obj){
+  Object.keys(dataConns).forEach(k=>{
+    try{ dataConns[k].send(obj); }catch(e){ console.warn('error send',e); }
+  });
+}
+function escapeHtml(text){
+  return String(text).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+}
+
+/* -------------------- Chat UI -------------------- */
 sendBtn.onclick=sendMessage;
-messageInput.addEventListener('keyup',e=>{if(e.key==='Enter')sendMessage();});
+messageInput.addEventListener('keyup',e=>{ if(e.key==='Enter') sendMessage(); });
+
 function sendMessage(){
-  const t=messageInput.value.trim(); if(!t)return;
-  if(t==='/admintools0011'){showAdmin(); messageInput.value=''; return;}
-  broadcast({type:'chat',name:userName,text:t,from:myId}); addMessage('Tú: '+t,'msg-me'); messageInput.value='';
+  const t=messageInput.value.trim(); if(!t) return;
+  // comando rápido para abrir admin: /banear
+  if(t==='/banear'){ showAdmin(); messageInput.value=''; return; }
+  // Enviar a todos
+  broadcast({type:'chat',name:userName,text:t,from:myId});
+  addMessage('Tú: '+escapeHtml(t),'msg-me'); messageInput.value='';
 }
 
-/* -------------------- Agregar amigos -------------------- */
+/* -------------------- Agregar amigo UI -------------------- */
 connectFriend.onclick=addFriend;
-friendInput.addEventListener('keyup',e=>{if(e.key==='Enter')addFriend();});
+friendInput.addEventListener('keyup',e=>{ if(e.key==='Enter') addFriend(); });
 function addFriend(){
-  const ap=friendInput.value.trim(); if(!ap)return; friendInput.value='';
+  const ap=friendInput.value.trim(); if(!ap) return; friendInput.value='';
   const pid='chat-'+ap;
-  if(ipBanList[pid] && ipBanList[pid]>Date.now()){ alert(ap+' está baneado temporalmente durante '+Math.ceil((ipBanList[pid]-Date.now())/1000)+'s'); return; }
+  if(isBanned(pid)){ alert(ap+' está baneado temporalmente durante '+Math.ceil((ipBanList[pid]-Date.now())/1000)+'s'); return; }
   connectToPeer(pid);
 }
 
-/* -------------------- Videollamada -------------------- */
-async function ensureLocalStream(){if(localStream)return localStream; try{localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); addLocalVideo(); return localStream;}catch(e){alert('No se pudo acceder a cámara/micro'); throw e;}}
-function addLocalVideo(){if(document.getElementById('localVideoContainer'))document.getElementById('localVideoContainer').remove(); const cont=document.createElement('div'); cont.id='localVideoContainer'; cont.className='video-container'; const v=document.createElement('video'); v.autoplay=true; v.muted=true; v.playsInline=true; v.srcObject=localStream; cont.appendChild(v); const label=document.createElement('div'); label.className='video-label'; label.textContent='Tú'; videosDiv.prepend(cont);}
-function createRemoteVideo(pid,stream){if(document.getElementById('video-'+pid))return; const cont=document.createElement('div'); cont.className='video-container'; cont.id='video-'+pid; const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.srcObject=stream; const label=document.createElement('div'); label.className='video-label'; label.textContent=pid.replace('chat-',''); cont.appendChild(v); videosDiv.appendChild(cont);}
-function removeRemoteVideo(pid){const el=document.getElementById('video-'+pid); if(el)el.remove(); if(mediaCalls[pid])delete mediaCalls[pid]; activeCallsUpdate();}
-function activeCallsUpdate(){activeCallsSpan.textContent=String(Object.keys(mediaCalls).length);}
-async function requestCall(pid){if(confirm('Solicitar videollamada a '+pid.replace('chat-','')+'?')){connectToPeer(pid); dataConns[pid].send({type:'callRequest'});}
+/* -------------------- Videollamada: flujo invertido para evitar pedir tu propia cámara cuando solo quieres ver a otro -------------------- */
+async function ensureLocalStream(){
+  if(localStream) return localStream;
+  try{
+    localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+    addLocalVideo();
+    return localStream;
+  }catch(e){
+    alert('No se pudo acceder a cámara/micro');
+    throw e;
+  }
 }
-async function handleCallRequest(from){if(confirm(from.replace('chat-','')+' solicita videollamada. Aceptar?')){connectToPeer(from); dataConns[from].send({type:'callAccepted'}); startCall(from);}}
-async function startCall(pid){await ensureLocalStream(); try{const call=peer.call(pid,localStream); mediaCalls[pid]=call; activeCallsUpdate(); call.on('stream',stream=>createRemoteVideo(pid,stream)); call.on('close',()=>removeRemoteVideo(pid));}catch(e){console.warn('call error',e);}}
-peer.on('call',async call=>{await ensureLocalStream(); call.answer(localStream); mediaCalls[call.peer]=call; call.on('stream',stream=>createRemoteVideo(call.peer,stream)); call.on('close',()=>removeRemoteVideo(call.peer));});
-hangupAllBtn.onclick=()=>{Object.keys(mediaCalls).forEach(pid=>{try{mediaCalls[pid].close();}catch(e){} removeRemoteVideo(pid);});}
 
-/* -------------------- Panel Admin -------------------- */
-function showAdmin(){adminPanel.style.display='block'; renderAdmin();}
-closeAdmin.onclick=()=>{adminPanel.style.display='none';}
-function renderAdmin(){adminList.innerHTML=''; knownPeers.forEach(pid=>{if(pid===myId)return; const row=document.createElement('div'); row.style.display='flex'; row.style.gap='8px'; const label=document.createElement('span'); label.textContent=pid.replace('chat-',''); const tempBan=document.createElement('button'); tempBan.textContent='TempBanIP'; tempBan.className='btn small kick'; tempBan.onclick=()=>tempBanUser(pid); row.appendChild(label); row.appendChild(tempBan); adminList.appendChild(row);});}
+function addLocalVideo(){
+  if(document.getElementById('localVideoContainer')) document.getElementById('localVideoContainer').remove();
+  const cont=document.createElement('div'); cont.id='localVideoContainer'; cont.className='video-container';
+  const v=document.createElement('video'); v.autoplay=true; v.muted=true; v.playsInline=true;
+  try{ v.srcObject = localStream; }catch(e){ console.warn(e); }
+  cont.appendChild(v);
+  const label=document.createElement('div'); label.className='video-label'; label.textContent='Tú';
+  cont.appendChild(label);
+  videosDiv.prepend(cont);
+}
+
+function createRemoteVideo(pid,stream){
+  if(document.getElementById('video-'+pid)) return;
+  const cont=document.createElement('div'); cont.className='video-container'; cont.id='video-'+pid;
+  const v=document.createElement('video'); v.autoplay=true; v.playsInline=true;
+  try{ v.srcObject = stream; }catch(e){ console.warn(e); }
+  cont.appendChild(v);
+  const label=document.createElement('div'); label.className='video-label'; label.textContent=pid.replace('chat-','');
+  cont.appendChild(label);
+  videosDiv.appendChild(cont);
+}
+
+function removeRemoteVideo(pid){
+  const el=document.getElementById('video-'+pid); if(el) el.remove();
+  if(mediaCalls[pid]){ try{ mediaCalls[pid].close(); }catch(e){} delete mediaCalls[pid]; }
+  activeCallsUpdate();
+}
+
+function activeCallsUpdate(){ activeCallsSpan.textContent = String(Object.keys(mediaCalls).length); }
+
+/* Nuevo requestCall: pedimos a remote que nos llame (si tiene cámara nos envía su stream sin pedir nuestra cámara) */
+function requestCall(pid){
+  if(isBanned(pid)){ alert(pid.replace('chat-','')+' está baneado.'); return; }
+  // asegurar conexión de datos
+  connectToPeer(pid);
+  if(dataConns[pid] && dataConns[pid].open){
+    dataConns[pid].send({type:'callRequest',from:myId});
+  } else {
+    alert('No hay conexión con '+pid);
+  }
+}
+
+/* handleCallRequest: cuando recibo solicitud */
+async function handleCallRequest(from){
+  if(isBanned(from)) return;
+  // Si tengo stream ya activo, NO necesito pedirle al solicitante que comparta su cámara.
+  if(localStream){
+    // Llamar de vuelta al solicitante con mi stream para que reciba mi video
+    try{
+      const call = peer.call(from, localStream);
+      mediaCalls[from]=call; activeCallsUpdate();
+      call.on('stream', stream => createRemoteVideo(from, stream));
+      call.on('close', ()=> removeRemoteVideo(from));
+    }catch(e){ console.warn('Error llamando de vuelta',e); }
+  } else {
+    // Preguntar si desea activar cámara para esta petición; si acepta, abrimos cámara y llamamos de vuelta.
+    if(confirm(from.replace('chat-','')+' te solicita que actives cámara para la llamada. ¿Activar y unirte?')){
+      try{
+        await ensureLocalStream();
+        // llamamos de vuelta
+        const call = peer.call(from, localStream);
+        mediaCalls[from]=call; activeCallsUpdate();
+        call.on('stream', stream => createRemoteVideo(from, stream));
+        call.on('close', ()=> removeRemoteVideo(from));
+      }catch(e){ console.warn('No pudo iniciarse cámara',e); }
+    } else {
+      // opcional enviar rechazo
+      connectToPeer(from);
+      if(dataConns[from] && dataConns[from].open) dataConns[from].send({type:'callRejected',from:myId});
+    }
+  }
+}
+
+/* startCall (compatibility) */
+async function startCall(pid){
+  try{
+    await ensureLocalStream();
+    const call = peer.call(pid, localStream);
+    mediaCalls[pid]=call; activeCallsUpdate();
+    call.on('stream',stream=>createRemoteVideo(pid,stream));
+    call.on('close',()=>removeRemoteVideo(pid));
+  }catch(e){ console.warn(e); }
+}
+
+/* inviteAll: enviamos callRequest a todos */
+document.getElementById('inviteAll').onclick = ()=>{
+  broadcast({type:'callRequest',from:myId});
+  addMessage('📣 Invitación a llamada enviada a todos','msg-me');
+};
+
+/* hangup */
+hangupAllBtn.onclick = ()=>{
+  Object.keys(mediaCalls).forEach(pid=>{
+    try{ if(mediaCalls[pid].close) mediaCalls[pid].close(); }catch(e){}
+    removeRemoteVideo(pid);
+  });
+  // Si existe video local, lo dejamos (no lo cerrar)
+};
+
+/* -------------------- Congelar cámara / detener (intento de freeze) -------------------- */
+stopCamBtn.onclick = async ()=>{
+  // Intentamos "congelar" la imagen que enviamos sustituyendo la pista por una captura de canvas (si hay video)
+  const localVideo = document.querySelector('#localVideoContainer video');
+  if(!localVideo) { alert('No hay cámara iniciada'); return; }
+  try{
+    // Crear canvas con el frame actual
+    const w = localVideo.videoWidth || 640;
+    const h = localVideo.videoHeight || 480;
+    const canvas = document.createElement('canvas'); canvas.width=w; canvas.height=h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(localVideo,0,0,w,h);
+    // Capturamos stream del canvas (frame fijo)
+    const frozenStream = canvas.captureStream(1); // 1 fps es suficiente
+    const frozenTrack = frozenStream.getVideoTracks()[0];
+
+    // Reemplazar en cada PeerConnection sender de video (PeerJS usa call.peerConnection)
+    Object.keys(mediaCalls).forEach(pid=>{
+      const call = mediaCalls[pid];
+      try{
+        if(call && call.peerConnection && typeof call.peerConnection.getSenders === 'function'){
+          const senders = call.peerConnection.getSenders();
+          const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+          if(videoSender){
+            videoSender.replaceTrack(frozenTrack).catch(e=>{ console.warn('replaceTrack fallo',e); });
+          }
+        } else {
+          // fallback: deshabilitar la pista original (se mostrará congelado o negro)
+          if(localStream){
+            localStream.getVideoTracks().forEach(t=>t.enabled = false);
+          }
+        }
+      }catch(e){ console.warn('error freeze',e); }
+    });
+
+    addMessage('🧊 Cámara congelada (los demás verán una imagen estática).','msg-me');
+  }catch(e){
+    // fallback simple: desactivar track
+    if(localStream){
+      localStream.getVideoTracks().forEach(t=>t.enabled = false);
+    }
+    addMessage('🧊 Cámara detenida (modo fallback).','msg-me');
+  }
+};
+
+/* startCam */
+startCamBtn.onclick = async ()=>{
+  try{
+    await ensureLocalStream();
+    addMessage('🎥 Cámara activada','msg-me');
+  }catch(e){}
+};
+
+/* -------------------- Panel Admin / Banear -------------------- */
+function showAdmin(){ adminPanel.style.display='block'; renderAdmin(); }
+closeAdmin.onclick = ()=>{ adminPanel.style.display='none'; }
+
+function renderAdmin(){
+  adminList.innerHTML='';
+  knownPeers.forEach(pid=>{
+    if(pid===myId) return;
+    const row=document.createElement('div'); row.style.display='flex'; row.style.gap='8px'; row.style.marginBottom='8px';
+    const label=document.createElement('span'); label.textContent=pid.replace('chat-','');
+    const tempBan=document.createElement('button'); tempBan.textContent='Banear (temporal)'; tempBan.className='btn small kick';
+    tempBan.onclick = ()=> tempBanUser(pid);
+    row.appendChild(label); row.appendChild(tempBan); adminList.appendChild(row);
+  });
+}
 
 function tempBanUser(pid){
-  const mins=prompt('Minutos de baneo','1'); if(!mins)return; const until=Date.now()+parseInt(mins)*60000;
-  ipBanList[pid]=until; broadcast({type:'tempBanIP',target:pid,until}); addMessage(`⛔ ${pid.replace('chat-','')} ha sido baneado temporalmente hasta ${new Date(until).toLocaleTimeString()}`);
-  if(dataConns[pid]){dataConns[pid].send({type:'tempBanIP',target:pid,until}); dataConns[pid].close(); delete dataConns[pid]; knownPeers.delete(pid); renderUsers();}
+  const mins = prompt('Minutos de baneo','1'); if(!mins) return;
+  const until = Date.now() + parseInt(mins)*60000;
+  ipBanList[pid] = until;
+  addMessage(`⛔ ${pid.replace('chat-','')} ha sido baneado temporalmente hasta ${new Date(until).toLocaleTimeString()}`);
+  // Informar a todos
+  broadcast({type:'tempBanIP',target:pid,until});
+  // Cerrar conexión con ese peer (si existe)
+  if(dataConns[pid]){ try{ dataConns[pid].send({type:'tempBanIP',target:pid,until}); dataConns[pid].close(); }catch(e){} delete dataConns[pid]; }
+  knownPeers.delete(pid); renderUsers();
 }
 
-/* -------------------- TempBan cuenta regresiva -------------------- */
+/* Limpieza periódica de baneos */
 setInterval(()=>{
-  const now=Date.now();
-  Object.keys(ipBanList).forEach(pid=>{if(ipBanList[pid]<=now){delete ipBanList[pid]; addMessage(pid.replace('chat-','')+' se ha unido tras cumplir su baneo');}});},1000);
+  const now = Date.now();
+  Object.keys(ipBanList).forEach(pid=>{
+    if(ipBanList[pid] <= now){
+      delete ipBanList[pid];
+      addMessage('🔓 '+pid.replace('chat-','')+' ha terminado su baneo');
+    }
+  });
+},1000);
 
-/* -------------------- Inicialización -------------------- */
+/* -------------------- Envío / recepción de archivos -------------------- */
+// fileInput envía el archivo como dataURL a todos los peers conectados (simple y funcional).
+fileInput.addEventListener('change', async (e)=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ()=> {
+    const dataUrl = reader.result;
+    // advertir tamaño (si muy grande, puede fallar)
+    try{
+      broadcast({type:'file',from:myId,name:f.name,size:f.size,dataUrl});
+      addMessage(`📁 Enviado archivo ${escapeHtml(f.name)} (${Math.round(f.size/1024)} KB)`,'msg-me');
+    }catch(e){
+      console.warn('Error enviando archivo',e);
+      addMessage('⚠️ Error enviando archivo','msg-me');
+    }
+  };
+  reader.readAsDataURL(f);
+  // reset input
+  e.target.value = '';
+});
+
+function receiveFile(data){
+  const name = data.name || 'archivo';
+  const size = data.size || 0;
+  const dataUrl = data.dataUrl;
+  if(!dataUrl) return;
+  const link = `<a class="file-link" href="${dataUrl}" download="${encodeURIComponent(name)}">📥 Descargar ${escapeHtml(name)} (${Math.round(size/1024)} KB)</a>`;
+  addMessage((data.from?escapeHtml(data.from.replace('chat-','')):'') + ' envió: ' + link,'msg-other');
+}
+
+/* -------------------- Nombre modal flujo -------------------- */
+nameSubmit.onclick = ()=> submitName();
+nameInput.addEventListener('keyup', e=>{ if(e.key==='Enter') submitName(); });
+
+function submitName(){
+  const v = nameInput.value.trim();
+  if(!v){ alert('Ingresa un apodo'); return; }
+  userName = v;
+  myId = 'chat-'+userName;
+  document.getElementById('meName').textContent = userName;
+  document.getElementById('meId').textContent = myId;
+  nameModal.style.display = 'none';
+  // iniciar Peer y render UI
+  initPeer();
+  renderUsers();
+}
+
+/* -------------------- Utilidades / compatibilidad -------------------- */
 renderUsers();
+
 </script>
 </body>
 </html>
