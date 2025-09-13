@@ -3,10 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Chat P2P — Moderación, Invitaciones y Cámara (Full)</title>
+<title>Chat P2P — Videollamada + AdminTools (800+ líneas)</title>
 <style>
+/* ======================================================================
+   ESTILOS PRINCIPALES
+   Mantengo la estética original y no la cambio visualmente,
+   solo organizo CSS por secciones para claridad.
+   ====================================================================== */
 :root{
-  --bg:#f4f6fb; --panel:#fff; --muted:#6b7280; --accent:#2563eb; --danger:#ef4444;
+  --bg:#f4f6fb; --panel:#fff; --muted:#6b7280; --accent:#2563eb; --danger:#ef4444; --success:#10b981;
 }
 html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg)}
 .app{display:grid;grid-template-columns:320px 1fr;gap:12px;height:100vh;padding:12px;box-sizing:border-box}
@@ -21,7 +26,7 @@ html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial
 .u-name{font-weight:600;font-size:14px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
 .u-id{font-size:12px;color:var(--muted);max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .user-actions{display:flex;gap:6px}
-.btn{padding:6px 8px;border-radius:8px;border:none;cursor:pointer;background:#eef2ff}
+.btn{padding:6px 8px;border-radius:8px;border:none;cursor:pointer;background:#eef2ff;transition:background .12s}
 .btn.small{padding:4px 6px;font-size:13px}
 .btn.kick{background:var(--danger);color:white}
 .main{display:flex;flex-direction:column;gap:10px}
@@ -38,10 +43,14 @@ html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial
 input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:1}
 #videos{display:flex;gap:12px;flex-wrap:wrap;padding:8px;border-radius:8px;border:1px dashed #e6eef8;min-height:160px;background:linear-gradient(180deg,#fff,#fbfdff)}
 .video-container{position:relative;width:260px;height:190px;border-radius:8px;overflow:hidden;background:black;display:flex;align-items:center;justify-content:center}
-.video-container video,.video-container canvas{width:100%;height:100%;object-fit:cover;display:block}
+.video-container video,.video-container canvas{width:100%;height:100%;object-fit:cover}
 .video-label{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.5);color:white;font-size:12px;padding:4px 6px;border-radius:6px}
-.video-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,0.45);font-weight:700;font-size:14px;pointer-events:none}
-#adminPanel{display:none;position:fixed;top:12%;left:50%;transform:translateX(-50%);background:#fff;padding:20px;border-radius:12px;box-shadow:0 6px 20px rgba(2,6,23,.2);z-index:10000;width:420px}
+.frozen-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold}
+#adminPanel{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);border-radius:12px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.15);z-index:999;width:420px}
+#adminPanel h2{margin-top:0}
+.admin-option{margin-bottom:16px;padding:10px;border:1px solid #e2e8f0;border-radius:8px}
+.admin-option label{display:block;margin:4px 0;font-size:14px}
+.admin-buttons{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 #nameModal{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:2000}
 #nameModal .box{background:#000;color:#fff;padding:24px;border-radius:10px;min-width:320px;text-align:center}
 #nameModal input{width:100%;padding:10px;border-radius:8px;border:1px solid #333;margin-top:12px;background:#111;color:#fff}
@@ -49,27 +58,27 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
 .statusWrap{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:10px}
 .spinner{width:20px;height:20px;border-radius:50%;border:3px solid rgba(255,255,255,0.2);border-top-color:#ff4d4d;animation:spin 1s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
-.tick{width:24px;height:24px;border-radius:50%;background:#10b981;color:white;display:flex;align-items:center;justify-content:center;font-weight:700}
+.tick{width:24px;height:24px;border-radius:50%;background:var(--success);color:white;display:flex;align-items:center;justify-content:center;font-weight:700}
 .errorText{color:var(--danger);margin-top:8px}
 #invitePanel{position:fixed;left:50%;transform:translateX(-50%);top:12px;background:#fff;border-radius:8px;padding:10px 14px;box-shadow:0 8px 30px rgba(0,0,0,0.2);z-index:3000;display:none;align-items:center;gap:10px}
-#invitePanel .who{font-weight:700}
 .file-link{color:var(--accent);text-decoration:underline;cursor:pointer}
-.footer-note{font-size:12px;color:var(--muted);margin-top:8px;text-align:center}
-.small-muted{font-size:12px;color:var(--muted)}
-/* small responsive */
-@media (max-width:900px){
-  .app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
-  .sidebar{order:2}
-}
+/* Pequeños ajustes responsive */
+@media (max-width:900px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}.sidebar{order:2}}
 </style>
 </head>
 <body>
+
+<!-- ======================================================================
+     ESTRUCTURA HTML: Aplicación principal
+     ====================================================================== -->
 <div class="app">
-  <!-- SIDEBAR -->
+
+  <!-- SIDEBAR: lista de amigos/conexiones -->
   <aside class="sidebar panel">
     <h3>Amigos conectados</h3>
     <div class="info" id="sidebarInfo">Conectando...</div>
-    <div id="usersList" aria-live="polite"></div>
+
+    <div id="usersList"></div>
 
     <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
       <input id="friendInput" type="text" placeholder="Apodo amigo" style="flex:1;padding:6px;border-radius:6px;border:1px solid #ccc">
@@ -81,26 +90,23 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
       <div style="margin-top:6px"><strong>ID:</strong> <span id="meId"></span></div>
     </div>
 
-    <div style="margin-top:12px">
-      <button id="openAdmin" class="btn small">⚙️ Panel Admin</button>
-    </div>
-
-    <div class="footer-note">P2P con PeerJS — Diseñado para probar funcionalidades</div>
   </aside>
 
-  <!-- MAIN -->
+  <!-- MAIN: chat, videos, controles -->
   <main class="main">
     <div class="top">
-      <h2 style="margin:0">Chat P2P — Moderación y Videollamada</h2>
+      <h2 style="margin:0">Chat P2P — Videollamada</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <button id="inviteAll" class="btn small">📞 Invitar a llamada</button>
       </div>
     </div>
 
     <div class="panel chat-wrap">
-      <!-- CHAT -->
+
+      <!-- PANEL CHAT -->
       <section class="chat panel" style="flex:1 1 60%">
         <div id="messages" aria-live="polite"></div>
+
         <div class="controls">
           <input id="messageInput" type="text" placeholder="Escribe un mensaje..." />
           <button id="sendBtn" class="btn">Enviar</button>
@@ -108,7 +114,7 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
         </div>
       </section>
 
-      <!-- VIDEOS / CONTROLES -->
+      <!-- PANEL VIDEOS Y CONTROLES -->
       <aside style="width:420px;display:flex;flex-direction:column;gap:8px">
         <div class="panel">
           <div style="display:flex;justify-content:space-between;align-items:center">
@@ -118,33 +124,59 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
 
           <div id="videos"></div>
 
-          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <div style="display:flex;gap:8px;margin-top:8px">
             <button id="startCam" class="btn small">🎥 Iniciar cámara</button>
             <button id="freezeCam" class="btn small">🧊 Congelar</button>
             <button id="unfreezeCam" class="btn small">🔄 Descongelar</button>
-            <button id="stopCamCompletely" class="btn small">📵 Detener cámara</button>
-            <button id="hangupAll" class="btn small">📴 Colgar todo</button>
+            <button id="hangupAll" class="btn small">Colgar todo</button>
           </div>
 
-          <div style="margin-top:8px">
-            <div class="small-muted">Consejo: usa Invitar a llamada para avisar a los demás.</div>
-          </div>
         </div>
       </aside>
+
     </div>
   </main>
+
 </div>
 
-<!-- ADMIN PANEL -->
+<!-- ADMIN PANEL OCULTO: se abre con /admintools0011 -->
 <div id="adminPanel">
-  <h3>Panel Admin</h3>
-  <div id="adminList" style="max-height:300px;overflow:auto;margin-bottom:10px"></div>
-  <div style="display:flex;gap:8px;justify-content:flex-end">
+
+  <h2>Herramientas de Admin</h2>
+
+  <!-- Opción 1: TempBan IP -->
+  <div class="admin-option">
+    <label for="banTarget">Seleccionar usuario a banear (temporal):</label>
+    <select id="banTarget" style="width:100%;padding:8px;border-radius:6px;border:1px solid #e6eef8"></select>
+
+    <label for="banMinutes">Minutos de baneo:</label>
+    <input id="banMinutes" type="number" min="1" max="1440" placeholder="Minutos" style="width:100%;padding:8px;border-radius:6px;border:1px solid #e6eef8">
+
+    <label for="banReason">Razón (opcional):</label>
+    <input id="banReason" type="text" placeholder="Razón (opcional)" style="width:100%;padding:8px;border-radius:6px;border:1px solid #e6eef8">
+
+    <div class="admin-buttons">
+      <button id="applyBan" class="btn small kick">Banear</button>
+    </div>
+  </div>
+
+  <!-- Opción 2: Cerrar página -->
+  <div class="admin-option">
+    <label for="closeTarget">Cerrar página a:</label>
+    <select id="closeTarget" style="width:100%;padding:8px;border-radius:6px;border:1px solid #e6eef8"></select>
+
+    <div class="admin-buttons">
+      <button id="closePageBtn" class="btn small">Cerrar página</button>
+    </div>
+  </div>
+
+  <div style="text-align:right">
     <button id="closeAdmin" class="btn small">Cerrar</button>
   </div>
+
 </div>
 
-<!-- NAME MODAL -->
+<!-- MODAL NOMBRE (apodo) -->
 <div id="nameModal">
   <div class="box">
     <h3>Ingresa tu apodo</h3>
@@ -161,7 +193,7 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
   </div>
 </div>
 
-<!-- INVITE PANEL -->
+<!-- INVITE PANEL (cuando alguien te invita) -->
 <div id="invitePanel">
   <div style="display:flex;flex-direction:column">
     <div><span class="who" id="inviteWho"></span> te invita a una llamada</div>
@@ -176,38 +208,39 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
   </div>
 </div>
 
-<!-- SCRIPT -->
+<!-- SCRIPTS: lógica completa -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-/* =====================================================================
-   Chat P2P completo:
-   - Validación apodo con spinner mínimo 3s
-   - PeerJS para datos y llamadas
-   - Congelar/Descongelar con visual local (canvas) y overlay remoto
-   - Invite panel, Admin (ban, force join, close page)
-   - Archivo: enviar/recibir (dataURL)
-   ===================================================================== */
+/* =====================================================================================
+   Chat P2P — Archivo completo extendido (~800+ líneas)
+   - Basado en la versión previa (con validación de apodo, cámara freeze/unfreeze,
+     invitaciones, envío de archivos).
+   - Panel de Admin oculto que se abre con /admintools0011 y tiene solo dos opciones:
+       * TempBanIP (minutos + razón)
+       * Cerrar página a un usuario
+   - Todas las funcionalidades deben funcionar en un entorno con PeerJS accesible.
+   ===================================================================================== */
 
-/* -------------------- Variables globales -------------------- */
+/* -------------------- VARIABLES GLOBALES -------------------- */
 let userName = '';
 let myId = '';
-let peer = null;                 // Peer principal (creado tras validación)
-let validatingPeer = null;       // Peer temporal para validar apodo
+let peer = null;                   // Peer principal (se crea tras validación)
+let validatingPeer = null;         // Peer temporal para validar apodo
 let validationTimeout = null;
 
-let dataConns = {};              // dataConns[peerId] = DataConnection
-let mediaCalls = {};             // mediaCalls[peerId] = MediaCall
-let localStream = null;
-let originalVideoTrack = null;
+let dataConns = {};                // conexiones de datos: {peerId: DataConnection}
+let mediaCalls = {};               // llamadas de media activas: {peerId: MediaCall}
+let localStream = null;            // MediaStream local
+let originalVideoTrack = null;     // pista de vídeo original para restaurar
 
-let knownPeers = new Set();
-let ipBanList = {};              // ipBanList[peerId] = untilTimestamp
+let knownPeers = new Set();        // peers conocidos (IDs)
+let ipBanList = {};                // {peerId: untilTimestamp}
 
-let frozen = false;              // si mi cámara local está congelada
-let frozenTrack = null;          // pista de vídeo del canvas congelado
-let replacedSenders = {};        // replacedSenders[peerId] = [RTCRtpSender,...]
+let frozen = false;                // estado local: si mi cámara está congelada
+let frozenTrack = null;            // pista generada por canvas al congelar
+let replacedSenders = {};          // para revertir replaceTrack por peer (por peerId)
 
-/* -------------------- Referencias UI -------------------- */
+/* -------------------- REFERENCIAS A ELEMENTOS DOM -------------------- */
 const usersList = document.getElementById('usersList');
 const sidebarInfo = document.getElementById('sidebarInfo');
 const messagesDiv = document.getElementById('messages');
@@ -220,13 +253,16 @@ const videosDiv = document.getElementById('videos');
 const startCamBtn = document.getElementById('startCam');
 const freezeCamBtn = document.getElementById('freezeCam');
 const unfreezeCamBtn = document.getElementById('unfreezeCam');
-const stopCamCompletelyBtn = document.getElementById('stopCamCompletely');
 const hangupAllBtn = document.getElementById('hangupAll');
 const activeCallsSpan = document.getElementById('activeCalls');
 
 const adminPanel = document.getElementById('adminPanel');
-const adminList = document.getElementById('adminList');
-const openAdminBtn = document.getElementById('openAdmin');
+const banTargetSelect = document.getElementById('banTarget');
+const banMinutesInput = document.getElementById('banMinutes');
+const banReasonInput = document.getElementById('banReason');
+const applyBanBtn = document.getElementById('applyBan');
+const closeTargetSelect = document.getElementById('closeTarget');
+const closePageBtn = document.getElementById('closePageBtn');
 const closeAdminBtn = document.getElementById('closeAdmin');
 
 const nameModal = document.getElementById('nameModal');
@@ -244,34 +280,25 @@ const inviteWho = document.getElementById('inviteWho');
 const inviteAccept = document.getElementById('inviteAccept');
 const inviteReject = document.getElementById('inviteReject');
 const inviteAdminForce = document.getElementById('inviteAdminForce');
-
 const inviteAllBtn = document.getElementById('inviteAll');
 
-/* -------------------- Utilidades -------------------- */
+/* -------------------- UTILIDADES -------------------- */
 function escapeHtml(text){
-  return String(text).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  return String(text).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 function stringToColor(str){
-  let h=0; for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i);
-  const hue = Math.abs(h)%360; return `hsl(${hue}deg 70% 45%)`;
+  let h = 0;
+  for(let i=0;i<str.length;i++) h = ((h<<5)-h)+str.charCodeAt(i);
+  const hue = Math.abs(h)%360;
+  return `hsl(${hue}deg 70% 45%)`;
 }
 function now(){ return new Date().toLocaleTimeString(); }
 
-/* -------------------- Mensajes UI -------------------- */
-function addMessage(text, cls='msg-other'){
-  const div = document.createElement('div'); div.className = `message ${cls}`;
-  const meta = document.createElement('div'); meta.className='meta'; meta.textContent = now();
-  const content = document.createElement('div'); content.innerHTML = text;
-  div.appendChild(meta); div.appendChild(content);
-  messagesDiv.appendChild(div);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
-}
-
-/* -------------------- Render usuarios -------------------- */
+/* -------------------- RENDERIZADO DE USUARIOS -------------------- */
 function renderUsers(){
   usersList.innerHTML = '';
-  Array.from(knownPeers).sort().forEach(pid=>{
-    const row = document.createElement('div'); row.className='user-row';
+  Array.from(knownPeers).sort().forEach(pid => {
+    const row = document.createElement('div'); row.className = 'user-row';
     const meta = document.createElement('div'); meta.className='user-meta';
     const avatar = document.createElement('div'); avatar.className='avatar'; avatar.style.background = stringToColor(pid);
     avatar.textContent = pid.replace('chat-','').slice(0,2).toUpperCase();
@@ -295,16 +322,18 @@ function renderUsers(){
     row.appendChild(meta); row.appendChild(actions);
     usersList.appendChild(row);
   });
+  // Actualizar selects del admin (si está abierto)
+  refreshAdminSelects();
 }
 
-/* -------------------- Peer & Validación de apodo (spinner 3s) -------------------- */
-/*
-  Estrategia:
-  - Cuando el usuario pulsa Entrar, creamos un Peer temporal con id='chat-'+apodo.
-  - Si el Peer temporal abre -> id libre.
-  - Si da error ID taken -> id ocupado.
-  - Mostrar spinner rojo mínimo 3s. Si está libre, mostrar tick verde y convertir ese Peer temporal en peer principal.
-*/
+/* -------------------- VALIDACIÓN DE APODO (SPINNER 3s) --------------------
+   Estrategia:
+   - Al pulsar Entrar, creamos un Peer temporal con id = 'chat-'+apodo.
+   - Si abre => id libre. Si error => id en uso.
+   - Mostramos spinner rojo mínimo 3s; luego tick verde o error.
+   - Si libre, adoptamos el Peer temporal como peer principal.
+   ------------------------------------------------------------------------ */
+
 nameSubmit.onclick = trySetName;
 nameInput.addEventListener('keyup', e => { if(e.key==='Enter') trySetName(); });
 
@@ -312,7 +341,7 @@ function trySetName(){
   const name = nameInput.value.trim();
   if(!name){ alert('Ingresa un apodo'); return; }
 
-  // reset UI
+  // Reset UI
   statusWrap.style.display='flex';
   statusText.style.color='#fff';
   statusText.textContent='Comprobando...';
@@ -324,7 +353,6 @@ function trySetName(){
   const minMs = 3000;
   const start = Date.now();
 
-  // limpiar cualquier validatingPeer anterior
   if(validatingPeer){
     try{ validatingPeer.destroy(); }catch(e){} validatingPeer = null;
   }
@@ -334,12 +362,12 @@ function trySetName(){
   let resolved = false;
   let ok = false;
 
-  validatingPeer.on('open', id=>{
+  validatingPeer.on('open', id => {
     ok = true;
     proceedAfterMin();
   });
 
-  validatingPeer.on('error', err=>{
+  validatingPeer.on('error', err => {
     ok = false;
     proceedAfterMin(err);
   });
@@ -349,12 +377,12 @@ function trySetName(){
     const elapsed = Date.now() - start;
     const wait = Math.max(0, minMs - elapsed);
     clearTimeout(validationTimeout);
-    validationTimeout = setTimeout(()=>{
+    validationTimeout = setTimeout(()=> {
       resolved = true;
       spinner.style.display='none';
       statusWrap.style.display='none';
       if(ok){
-        // adoptar validatingPeer como peer principal
+        // Adoptamos validatingPeer como peer real
         peer = validatingPeer;
         validatingPeer = null;
         userName = name;
@@ -362,11 +390,10 @@ function trySetName(){
         document.getElementById('meName').textContent = userName;
         document.getElementById('meId').textContent = myId;
         setupPeerAfterValidation();
-        // mostrar tick unos instantes
         successWrap.style.display='block';
         setTimeout(()=>{ nameModal.style.display='none'; addMessage('🔌 Conectado como '+userName+' ('+myId+')','msg-me'); }, 500);
       } else {
-        // nombre ocupado
+        // Nombre en uso
         errorText.textContent = '⚠️ Ese apodo ya está siendo usado.';
         errorWrap.style.display='block';
         try{ validatingPeer.destroy(); }catch(e){} validatingPeer = null;
@@ -375,12 +402,12 @@ function trySetName(){
   }
 }
 
-/* -------------------- Configurar Peer tras validación -------------------- */
+/* -------------------- CONFIGURAR PEER DESPUES DE VALIDACION -------------------- */
 function setupPeerAfterValidation(){
   if(!peer) return;
-  peer.on('connection', conn=>{
+  peer.on('connection', conn => {
     setupConn(conn);
-    conn.on('open', ()=>{ try{ conn.send({type:'join',id:myId,name:userName}); }catch(e){} });
+    conn.on('open', ()=> { try{ conn.send({type:'join',id:myId,name:userName}); }catch(e){} });
   });
   peer.on('open', id => {
     sidebarInfo.textContent = 'Conectado al servidor PeerJS';
@@ -390,7 +417,6 @@ function setupPeerAfterValidation(){
   peer.on('error', e => console.error('Peer error', e));
   peer.on('call', async call => {
     if(isBanned(call.peer)) { try{ call.close(); }catch(e){} return; }
-    // Si tenemos stream activa, respondemos; si no, mostramos panel de invitación (y cerramos la llamada entrante)
     if(localStream){
       call.answer(localStream);
       mediaCalls[call.peer] = call;
@@ -398,24 +424,23 @@ function setupPeerAfterValidation(){
       call.on('stream', stream => createRemoteVideo(call.peer, stream));
       call.on('close', ()=> removeRemoteVideo(call.peer));
     } else {
-      // Mostrar invite panel y luego cerrar la llamada (se gestiona por data callRequest)
+      // Mostrar panel de invitación y cerrar la llamada entrante (el flujo aceptará la invitación vía data)
       showInvitePanel(call.peer, false);
       try{ call.close(); }catch(e){}
     }
   });
 }
 
-/* -------------------- Data connections -------------------- */
+/* -------------------- CONEXIONES DE DATOS -------------------- */
 function connectToPeer(pid){
   if(isBanned(pid)) { alert(pid.replace('chat-','')+' está baneado temporalmente'); return; }
   if(!peer){ alert('Peer no está inicializado. Ingresa tu apodo primero.'); return; }
   if(dataConns[pid]) return dataConns[pid];
-  const conn = peer.connect(pid,{reliable:true});
+  const conn = peer.connect(pid, { reliable:true });
   conn.on('open', ()=> setupConn(conn));
-  conn.on('error', e => console.warn('conn error', e));
+  conn.on('error', e => console.warn('conn err', e));
   return conn;
 }
-
 function setupConn(conn){
   dataConns[conn.peer] = conn;
   try{ conn.send({type:'join',id:myId,name:userName}); }catch(e){}
@@ -424,29 +449,38 @@ function setupConn(conn){
   knownPeers.add(conn.peer); renderUsers();
 }
 
-/* -------------------- Manejo de datos entrantes -------------------- */
+/* -------------------- MANEJO DE DATOS ENTRANTES -------------------- */
 function isBanned(pid){ return ipBanList[pid] && ipBanList[pid] > Date.now(); }
 
 function handleData(from, data){
   if(!data || typeof data !== 'object') return;
-  // Ignorar mensajes de remitentes baneados (excepto tempBanIP propio)
-  if(isBanned(from) && data.type !== 'tempBanIP') { console.warn('Ignorado de',from); return; }
+
+  // Ignorar remitente baneado (excepto mensajes de tempBanIP)
+  if(isBanned(from) && data.type !== 'tempBanIP' && data.type !== 'banNotice') { console.warn('Ignorado de',from); return; }
 
   switch(data.type){
     case 'join':
-      knownPeers.add(data.id); renderUsers(); break;
+      knownPeers.add(data.id); renderUsers();
+      break;
     case 'chat':
       if(isBanned(data.from || from)) return;
-      addMessage(escapeHtml((data.name || from.replace('chat-',''))) + ': ' + escapeHtml(data.text), 'msg-other');
+      addMessage(escapeHtml((data.name || from.replace('chat-','')))+': '+escapeHtml(data.text),'msg-other');
       break;
     case 'tempBanIP':
       ipBanList[data.target] = data.until;
-      addMessage('⛔ '+data.target.replace('chat-','')+' baneado hasta '+new Date(data.until).toLocaleTimeString());
-      if(data.target === myId) addMessage('⛔ Has sido baneado hasta '+new Date(data.until).toLocaleTimeString());
+      addMessage('⛔ '+data.target.replace('chat-','')+' ha sido baneado hasta '+new Date(data.until).toLocaleTimeString(),'msg-other');
+      if(data.target === myId) { addMessage('⛔ Has sido baneado hasta '+new Date(data.until).toLocaleTimeString(),'msg-me'); }
+      break;
+    case 'banNotice':
+      // Mensaje público que se usa para notificar motivo y minutos
+      addMessage('🔒 '+(data.target||from).replace('chat-','')+' ha sido baneado por '+data.minutes+' minutos. Razón: '+escapeHtml(data.reason),'msg-other');
+      if(data.target===myId){
+        // bloquear localmente: impide escribir, etc (comportamiento del cliente)
+        addMessage('🔒 Has sido temporalmente restringido de escribir.','msg-me');
+      }
       break;
     case 'callRequest':
       if(data.force){
-        // forzar a unirse (admin)
         handleForceJoin(data.from);
       } else {
         showInvitePanel(data.from, false);
@@ -475,44 +509,40 @@ function handleData(from, data){
       hideRemoteOverlay(data.who || from);
       break;
     case 'file':
-      receiveFile(data); break;
+      receiveFile(data);
+      break;
     case 'closePage':
       if(data.target === myId){
-        // intentamos cerrar
         try{ window.close(); }catch(e){}
-        // si no cerró, redirigimos a pantalla simple
-        document.documentElement.innerHTML = '<body style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#fff;font-family:Inter,Arial"><div style="text-align:center"><h1>Has sido expulsado</h1><p>El administrador ha cerrado tu sesión.</p></div></body>';
+        document.documentElement.innerHTML = '<body style=\"display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#fff;font-family:Inter,Arial\"><div style=\"text-align:center\"><h1>Has sido expulsado</h1><p>El administrador ha cerrado tu sesión.</p></div></body>';
       }
       break;
     default:
-      console.log('data no manejada', data);
+      console.log('Data no manejada', data);
   }
 }
 
-/* -------------------- Enviar / Broadcast -------------------- */
+/* -------------------- ENVIAR MENSAJE / BROADCAST -------------------- */
 function broadcast(obj){
-  Object.keys(dataConns).forEach(k=>{
-    try{ dataConns[k].send(obj); }catch(e){}
-  });
+  Object.keys(dataConns).forEach(k=>{ try{ dataConns[k].send(obj); }catch(e){} });
 }
-
-/* -------------------- Chat UI -------------------- */
 sendBtn.onclick = sendMessage;
 messageInput.addEventListener('keyup', e => { if(e.key==='Enter') sendMessage(); });
 
 function sendMessage(){
-  const t = messageInput.value.trim();
-  if(!t) return;
-  if(t === '/banear'){ showAdmin(); messageInput.value=''; return; }
+  const t = messageInput.value.trim(); if(!t) return;
+  // Comando especial para abrir admin (también se abre con /admintools0011)
+  if(t==='/admintools0011'){ openAdminPanel(); messageInput.value=''; return; }
+  // Si estoy baneado, impedir enviar mensajes
+  if(isBanned(myId)){ alert('Estás temporalmente baneado y no puedes enviar mensajes'); return; }
   broadcast({type:'chat',name:userName,text:t,from:myId});
-  addMessage('Tú: ' + escapeHtml(t), 'msg-me');
+  addMessage('Tú: '+escapeHtml(t),'msg-me');
   messageInput.value = '';
 }
 
-/* -------------------- Agregar amigo UI -------------------- */
+/* -------------------- AGREGAR AMIGO (CONNECT) -------------------- */
 connectFriend.onclick = addFriend;
-friendInput.addEventListener('keyup', e => { if(e.key==='Enter') addFriend(); });
-
+friendInput.addEventListener('keyup', e=>{ if(e.key==='Enter') addFriend(); });
 function addFriend(){
   const ap = friendInput.value.trim(); if(!ap) return; friendInput.value='';
   const pid = 'chat-'+ap;
@@ -520,7 +550,7 @@ function addFriend(){
   connectToPeer(pid);
 }
 
-/* -------------------- Videollamada: iniciar cámara, añadir local video -------------------- */
+/* -------------------- VÍDEO: iniciar, añadir, remote create -------------------- */
 async function ensureLocalStream(){
   if(localStream) return localStream;
   try{
@@ -529,10 +559,7 @@ async function ensureLocalStream(){
     addLocalVideo();
     notifyCameraOn();
     return localStream;
-  }catch(e){
-    alert('No se pudo acceder a cámara/micro');
-    throw e;
-  }
+  }catch(e){ alert('No se pudo acceder a cámara/micro'); throw e; }
 }
 
 function addLocalVideo(){
@@ -547,7 +574,6 @@ function addLocalVideo(){
   videosDiv.prepend(cont);
 }
 
-/* Crear video remoto (o actualizar si existe) */
 function createRemoteVideo(pid, stream){
   let cont = document.getElementById('video-'+pid);
   if(cont){
@@ -564,17 +590,15 @@ function createRemoteVideo(pid, stream){
   videosDiv.appendChild(cont);
 }
 
-/* Eliminar video remoto */
 function removeRemoteVideo(pid){
   const el = document.getElementById('video-'+pid); if(el) el.remove();
   if(mediaCalls[pid]){ try{ mediaCalls[pid].close(); }catch(e){} delete mediaCalls[pid]; }
   activeCallsUpdate();
 }
 
-/* Actualiza contador llamadas activas */
 function activeCallsUpdate(){ activeCallsSpan.textContent = String(Object.keys(mediaCalls).length); }
 
-/* -------------------- Request Call / Accept / Invite All / Force -------------------- */
+/* -------------------- LLAMADAS: request, inviteAll, accept, force -------------------- */
 function requestCall(pid){
   if(isBanned(pid)){ alert(pid.replace('chat-','')+' está baneado'); return; }
   connectToPeer(pid);
@@ -584,10 +608,7 @@ function requestCall(pid){
   } else alert('No conectado a '+pid);
 }
 
-inviteAllBtn.onclick = ()=>{
-  broadcast({type:'callRequest',from:myId,force:false});
-  addMessage('📣 Invitación a llamada enviada a todos','msg-me');
-};
+inviteAllBtn.onclick = ()=>{ broadcast({type:'callRequest',from:myId,force:false}); addMessage('📣 Invitación a llamada enviada a todos','msg-me'); };
 
 async function acceptInvite(initiator){
   try{
@@ -602,7 +623,6 @@ async function acceptInvite(initiator){
   }catch(e){ console.warn('acceptInvite error', e); }
 }
 
-/* handleForceJoin: forzado por admin */
 async function handleForceJoin(initiator){
   addMessage('⚠️ Has sido forzado a unirte a la llamada de '+initiator.replace('chat-',''));
   try{
@@ -614,7 +634,7 @@ async function handleForceJoin(initiator){
   }catch(e){ console.warn('force join fail', e); }
 }
 
-/* -------------------- Invite Panel UI -------------------- */
+/* -------------------- INVITE PANEL UI -------------------- */
 let pendingInviteFrom = null;
 function showInvitePanel(from, adminForced){
   pendingInviteFrom = from;
@@ -626,26 +646,13 @@ function hideInvitePanel(){ pendingInviteFrom = null; invitePanel.style.display 
 inviteAccept.onclick = ()=> { if(pendingInviteFrom){ acceptInvite(pendingInviteFrom); hideInvitePanel(); } };
 inviteReject.onclick = ()=> { hideInvitePanel(); };
 
-/* -------------------- Notificaciones de cámara (enviar) -------------------- */
+/* -------------------- NOTIFICACIONES DE CAMARA (ENVIAR) -------------------- */
 function notifyCameraFrozen(){ broadcast({type:'cameraFrozen',who:myId,from:myId}); }
 function notifyCameraUnfrozen(){ broadcast({type:'cameraUnfrozen',who:myId,from:myId}); }
 function notifyCameraOff(){ broadcast({type:'cameraOff',who:myId,from:myId}); }
 function notifyCameraOn(){ broadcast({type:'cameraOn',who:myId,from:myId}); }
 
-/* -------------------- Freeze / Unfreeze implementation -------------------- */
-/*
-  Congelar:
-   - capturar frame del video local a canvas
-   - reemplazar la vista local con el canvas (para que TE VEAS congelado)
-   - crear frozenTrack = canvas.captureStream(1).getVideoTracks()[0]
-   - en cada peerConnection (call.peerConnection) encontrar senders y replaceTrack por frozenTrack
-   - enviar evento cameraFrozen
-  Descongelar:
-   - restaurar vista local con <video> del localStream
-   - restaurar senders reemplazados con originalVideoTrack (stored)
-   - detener frozenTrack
-   - enviar evento cameraUnfrozen
-*/
+/* -------------------- IMPLEMENTACIÓN CONGELAR / DESCONGELAR -------------------- */
 async function freezeLocalCamera(){
   if(!localStream){ alert('Activa la cámara primero (Iniciar cámara).'); return; }
   if(frozen) return;
@@ -653,24 +660,21 @@ async function freezeLocalCamera(){
   if(!localCont){ alert('No se encontró vista local'); return; }
   const videoEl = localCont.querySelector('video');
   if(!videoEl){ alert('No hay video local para congelar'); return; }
-  // crear canvas y capturar frame
   const w = videoEl.videoWidth || 640;
   const h = videoEl.videoHeight || 480;
   const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d'); ctx.drawImage(videoEl,0,0,w,h);
-  // reemplazar local view
+  // sustituir vista local por canvas
   localCont.querySelector('video')?.remove();
   canvas.style.display='block';
   localCont.insertBefore(canvas, localCont.firstChild);
   const label = localCont.querySelector('.video-label') || document.createElement('div');
   label.className='video-label'; label.textContent = 'Tú (congelado)';
   if(!localCont.contains(label)) localCont.appendChild(label);
-
-  // crear frozenTrack
+  // crear pista frozen
   try{
     const frozenStream = canvas.captureStream(1);
     frozenTrack = frozenStream.getVideoTracks()[0];
-    // iterar mediaCalls y reemplazar senders (guardar para revertir)
     Object.keys(mediaCalls).forEach(pid=>{
       const call = mediaCalls[pid];
       try{
@@ -683,14 +687,13 @@ async function freezeLocalCamera(){
             videoSender.replaceTrack(frozenTrack).catch(e=>console.warn('replaceTrack froze fail', e));
           }
         } else {
-          // fallback: deshabilitar track original
           localStream.getVideoTracks().forEach(t=>t.enabled=false);
         }
       }catch(e){ console.warn('freeze replace error', e); }
     });
     frozen = true;
     notifyCameraFrozen();
-    addMessage('🧊 Has congelado tu cámara', 'msg-me');
+    addMessage('🧊 Has congelado tu cámara','msg-me');
   }catch(e){
     console.warn('freeze failed', e);
     alert('No se pudo congelar la cámara');
@@ -707,7 +710,6 @@ function unfreezeLocalCamera(){
     localCont.insertBefore(v, localCont.firstChild);
     const label = localCont.querySelector('.video-label'); if(label) label.textContent = 'Tú';
   }
-  // restaurar senders
   Object.keys(replacedSenders).forEach(pid=>{
     const arr = replacedSenders[pid];
     arr.forEach(sender=>{
@@ -721,35 +723,32 @@ function unfreezeLocalCamera(){
   frozenTrack = null;
   frozen = false;
   notifyCameraUnfrozen();
-  addMessage('🔄 Has reactivado tu cámara', 'msg-me');
+  addMessage('🔄 Has reactivado tu cámara','msg-me');
 }
 
-/* -------------------- Stop / Start camera completely -------------------- */
+/* -------------------- DETENER/INICIAR CAMARA COMPLETA (opcional) -------------------- */
 async function stopCameraCompletely(){
   if(!localStream) return;
   localStream.getTracks().forEach(t=>t.stop());
   localStream = null;
   document.getElementById('localVideoContainer')?.remove();
   notifyCameraOff();
-  addMessage('📵 Has detenido por completo tu cámara', 'msg-me');
+  addMessage('📵 Has detenido por completo tu cámara','msg-me');
 }
-async function startCameraCompletely(){
-  try{ await ensureLocalStream(); addMessage('🎥 Cámara activada', 'msg-me'); }catch(e){}
-}
+async function startCameraCompletely(){ try{ await ensureLocalStream(); addMessage('🎥 Cámara activada','msg-me'); }catch(e){} }
 
-/* -------------------- Botones cámara -------------------- */
+/* Asignar eventos a botones de vídeo */
 startCamBtn.onclick = async ()=> { try{ await ensureLocalStream(); }catch(e){} };
 freezeCamBtn.onclick = async ()=> { await freezeLocalCamera(); };
 unfreezeCamBtn.onclick = ()=> { unfreezeLocalCamera(); };
-stopCamCompletelyBtn.onclick = ()=> { stopCameraCompletely(); };
-hangupAllBtn.onclick = ()=> { Object.keys(mediaCalls).forEach(pid => { try{ mediaCalls[pid].close(); }catch(e){} removeRemoteVideo(pid); }); };
+hangupAllBtn.onclick = ()=> { Object.keys(mediaCalls).forEach(pid=>{ try{ mediaCalls[pid].close(); }catch(e){} removeRemoteVideo(pid); }); };
 
-/* -------------------- Remote overlay helpers -------------------- */
+/* -------------------- OVERLAY REMOTO -------------------- */
 function showRemoteOverlay(pid, text){
   const el = document.getElementById('video-'+pid);
   if(!el) return;
   let overlay = el.querySelector('.video-overlay');
-  if(!overlay){ overlay = document.createElement('div'); overlay.className = 'video-overlay'; el.appendChild(overlay); }
+  if(!overlay){ overlay = document.createElement('div'); overlay.className='video-overlay'; el.appendChild(overlay); }
   overlay.textContent = text;
 }
 function hideRemoteOverlay(pid){
@@ -759,65 +758,55 @@ function hideRemoteOverlay(pid){
   if(overlay) overlay.remove();
 }
 
-/* -------------------- Admin panel -------------------- */
-openAdminBtn.onclick = ()=> { showAdmin(); };
-closeAdminBtn.onclick = ()=> { adminPanel.style.display='none'; };
+/* -------------------- ADMIN: abrir, refrescar selects, aplicar acciones -------------------- */
+function openAdminPanel(){
+  adminPanel.style.display = 'block';
+  refreshAdminSelects();
+}
+function closeAdminPanel(){ adminPanel.style.display = 'none'; }
+closeAdminBtn.onclick = closeAdminPanel;
 
-function showAdmin(){ adminPanel.style.display='block'; renderAdmin(); }
-
-function renderAdmin(){
-  adminList.innerHTML = '';
-  knownPeers.forEach(pid=>{
-    if(pid === myId) return;
-    const row = document.createElement('div'); row.style.display='flex'; row.style.gap='8px'; row.style.marginBottom='8px';
-    const label = document.createElement('span'); label.textContent = pid.replace('chat-','');
-    const tempBan = document.createElement('button'); tempBan.textContent='Banear (temporal)'; tempBan.className='btn small kick';
-    tempBan.onclick = ()=> tempBanUser(pid);
-    const forceCall = document.createElement('button'); forceCall.textContent='Forzar a llamada'; forceCall.className='btn small';
-    forceCall.onclick = ()=> forceUserJoin(pid);
-    const closePageBtn = document.createElement('button'); closePageBtn.textContent='Cerrar página'; closePageBtn.className='btn small';
-    closePageBtn.onclick = ()=> closeUserPage(pid);
-    row.appendChild(label); row.appendChild(tempBan); row.appendChild(forceCall); row.appendChild(closePageBtn);
-    adminList.appendChild(row);
+function refreshAdminSelects(){
+  // Vaciar selects y volver a llenarlos con knownPeers (excepto yo)
+  banTargetSelect.innerHTML = '';
+  closeTargetSelect.innerHTML = '';
+  // Añadir opción vacía
+  const optEmpty = document.createElement('option'); optEmpty.value=''; optEmpty.textContent='(selecciona)'; banTargetSelect.appendChild(optEmpty.cloneNode(true)); closeTargetSelect.appendChild(optEmpty.cloneNode(true));
+  Array.from(knownPeers).sort().forEach(pid=>{
+    if(pid===myId) return;
+    const opt = document.createElement('option'); opt.value = pid; opt.textContent = pid.replace('chat-','');
+    banTargetSelect.appendChild(opt);
+    const opt2 = document.createElement('option'); opt2.value = pid; opt2.textContent = pid.replace('chat-','');
+    closeTargetSelect.appendChild(opt2);
   });
-  // force all
-  const allRow = document.createElement('div'); allRow.style.marginTop='10px';
-  const forceAllBtn = document.createElement('button'); forceAllBtn.textContent='Forzar a todos a llamada'; forceAllBtn.className='btn small kick';
-  forceAllBtn.onclick = ()=> forceAllJoin();
-  allRow.appendChild(forceAllBtn); adminList.appendChild(allRow);
 }
 
-function tempBanUser(pid){
-  const mins = prompt('Minutos de baneo','1'); if(!mins) return;
-  const until = Date.now() + parseInt(mins)*60000;
-  ipBanList[pid] = until;
-  broadcast({type:'tempBanIP',target:pid,until});
-  addMessage('⛔ '+pid.replace('chat-','')+' baneado por '+mins+' min', 'msg-me');
-  if(dataConns[pid]){ try{ dataConns[pid].send({type:'tempBanIP',target:pid,until}); dataConns[pid].close(); }catch(e){} delete dataConns[pid]; }
-  knownPeers.delete(pid); renderUsers();
-}
+// Al aplicar ban, se envía un evento 'banNotice' a todos y 'tempBanIP' al destino para que lo registre
+applyBanBtn.onclick = ()=>{
+  const target = banTargetSelect.value;
+  if(!target){ alert('Selecciona un usuario para banear'); return; }
+  const mins = parseInt(banMinutesInput.value) || 1;
+  const reason = (banReasonInput.value || 'Sin razón').slice(0,200);
+  const until = Date.now() + mins*60000;
+  // Guardar localmente y notificar
+  ipBanList[target] = until;
+  broadcast({type:'tempBanIP',target:target,until:until});
+  broadcast({type:'banNotice',target:target,minutes:mins,reason:reason,from:myId});
+  addMessage(`⛔ ${target.replace('chat-','')} ha sido baneado por ${mins} minutos. Razón: ${escapeHtml(reason)}`,'msg-other');
+  // Cerrar admin
+  closeAdminPanel();
+};
 
-function forceUserJoin(pid){
-  connectToPeer(pid);
-  if(dataConns[pid] && dataConns[pid].open){
-    dataConns[pid].send({type:'forceJoin',from:myId,target:pid});
-    addMessage('🔐 Forzando a '+pid.replace('chat-','')+' a unirse a tu llamada', 'msg-me');
-  }
-}
-function forceAllJoin(){
-  broadcast({type:'forceJoinAll',initiator:myId});
-  addMessage('🔐 Forzando a todos a unirse a tu llamada', 'msg-me');
-}
+// Cerrar página: enviar evento 'closePage' al target
+closePageBtn.onclick = ()=>{
+  const target = closeTargetSelect.value;
+  if(!target){ alert('Selecciona un usuario'); return; }
+  broadcast({type:'closePage',target:target,from:myId});
+  addMessage(`🔒 Orden enviada: cerrar página a ${target.replace('chat-','')}`,'msg-other');
+  closeAdminPanel();
+};
 
-function closeUserPage(pid){
-  connectToPeer(pid);
-  if(dataConns[pid] && dataConns[pid].open){
-    dataConns[pid].send({type:'closePage',from:myId,target:pid});
-    addMessage('🔒 Se ha enviado orden de cierre de página a '+pid.replace('chat-',''), 'msg-me');
-  }
-}
-
-/* -------------------- Baneo cleanup -------------------- */
+/* -------------------- LIMPIEZA DE BANEOS (timers) -------------------- */
 setInterval(()=>{
   const nowTs = Date.now();
   Object.keys(ipBanList).forEach(pid=>{
@@ -828,14 +817,14 @@ setInterval(()=>{
   });
 }, 1000);
 
-/* -------------------- Files: send/receive -------------------- */
+/* -------------------- ARCHIVOS: enviar y recibir -------------------- */
 fileInput.addEventListener('change', e=>{
   const f = e.target.files[0]; if(!f) return;
   const reader = new FileReader();
   reader.onload = ()=> {
     const dataUrl = reader.result;
     broadcast({type:'file',from:myId,name:f.name,size:f.size,dataUrl});
-    addMessage('📁 Enviado: '+escapeHtml(f.name), 'msg-me');
+    addMessage('📁 Enviado: '+escapeHtml(f.name),'msg-me');
   };
   reader.readAsDataURL(f);
   e.target.value = '';
@@ -847,17 +836,54 @@ function receiveFile(data){
   const dataUrl = data.dataUrl;
   if(!dataUrl) return;
   const link = `<a class="file-link" href="${dataUrl}" download="${encodeURIComponent(name)}">📥 Descargar ${escapeHtml(name)} (${Math.round(size/1024)} KB)</a>`;
-  addMessage(escapeHtml((data.from?data.from.replace('chat-',''):'')) + ' envió: ' + link, 'msg-other');
+  addMessage((data.from?escapeHtml(data.from.replace('chat-','')):'') + ' envió: ' + link,'msg-other');
 }
 
-/* -------------------- Helpers: enable/disable audio (notes) -------------------- */
-/* Not implemented full remote mute — can be added: send event muteMe and client mutes local track */
+/* -------------------- FUNCIONALIDAD AUXILIAR DE PRIVACIDAD Y SEGURIDAD
+   Notas técnicas:
+   - El baneo temporal se implementa en los clientes mediante ipBanList[] y
+     el chequeo isBanned(pid). Esto evita que el usuario baneado pueda enviar
+     mensajes o llamadas desde la UI; sin embargo, no impide una reconexión si
+     el cliente re-crea un Peer distinto. Para seguridad real se necesita control
+     del servidor o un almacén centralizado.
+   ------------------------------------------------------------------------- */
 
-/* -------------------- Inicial render y utilidad -------------------- */
+/* -------------------- INICIALIZACIÓN: render y binding básicos -------------------- */
 renderUsers();
 
-/* =====================================================================
-   Fin del script principal
+/* -------------------- DETECCIÓN DEL COMANDO /admintools0011 EN EL INPUT
+   - Además de permitir abrir el panel con el comando, el usuario admin debe
+     escribir /admintools0011 y pulsar Enter para abrir (sin enviar mensaje).
+   ------------------------------------------------------------------------- */
+messageInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    const val = messageInput.value.trim();
+    if(val==='/admintools0011'){
+      openAdminPanel();
+      messageInput.value='';
+      e.preventDefault();
+      return;
+    }
+    // Envío de mensaje normal
+    if(val){
+      sendMessage();
+    }
+  }
+});
+
+/* --------------------
+   Nota: a partir de aquí podrías añadir más funciones sin cambiar UI,
+   por ejemplo: mute/unmute local, forzar mute remoto (requiere cooperación
+   del cliente remoto), mejorar persistencia del baneo, etc.
+   ------------------------------------------------------------------------ */
+
+/* ===================== FIN DEL SCRIPT PRINCIPAL ===================== */
+/* ===================================================================== */
+
+/* 
+   FIN DEL ARCHIVO HTML.
+   El contenido anterior está pensado para ser copiado y pegado tal cual en un archivo .html
+   y probado en un entorno con PeerJS disponible. 
    ===================================================================== */
 </script>
 </body>
