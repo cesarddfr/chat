@@ -6,10 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>talka</title>
 <style>
-/* =========================================================================
-   ESTILOS PRINCIPALES
-   Mantengo la estética original: no cambiar apariencia (según tu pedido)
-   ========================================================================= */
+
 :root{
   --bg:#f4f6fb; --panel:#fff; --muted:#6b7280; --accent:#2563eb; --danger:#ef4444; --success:#10b981;
 }
@@ -71,9 +68,6 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
 </head>
 <body>
 
-<!-- =====================================================================
-     Estructura HTML principal: sidebar, main, videos, chat, admin modal
-     ===================================================================== -->
 
 <div class="app">
   <aside class="sidebar panel">
@@ -223,24 +217,9 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
 <!-- Load PeerJS -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
-<!-- ====================================================================
-     SCRIPT: lógica completa, muchas líneas y comentarios para superar
-     900 líneas y facilitar lectura y modificación.
-     ==================================================================== -->
+
 <script>
-/* ==========================================================================
-   VARIABLES GLOBALES Y ESTADO
-   ========================================================================== */
-/*
-  Diseño general:
-  - peer: instancia Peer de PeerJS creada tras validación de apodo.
-  - dataConns: conexiones de datos abiertas hacia otros peers.
-  - mediaCalls: llamadas de media activas (PeerJS Call objects).
-  - localStream: MediaStream local (cámara + mic).
-  - displayNames: mapa peerId -> nombre mostrado (para no mostrar un chat de "X ahora se llama Y").
-  - ipBanList: mapa peerId -> timestamp hasta el que está baneado.
-  - pendingIncomingConns: cuando requireFriendAccept está ON guardamos conexiones entrantes en pending hasta aceptar.
-*/
+
 
 let userName = '';            // apodo real ingresado inicialmente (usado para ID si decides)
 let displayName = '';         // nombre visible en chat (puede cambiar via admin)
@@ -348,10 +327,7 @@ function addMessage(text, cls='msg-other'){
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-/* ==========================================================================
-   RENDERIZAR LISTA DE USUARIOS
-   - Usa displayNames si está disponible para mostrar nombre bonito.
-   ========================================================================== */
+
 function renderUsers(){
   usersList.innerHTML = '';
   Array.from(knownPeers).sort().forEach(pid=>{
@@ -448,11 +424,7 @@ function trySetName(){
   }
 }
 
-/* ==========================================================================
-   CONFIGURAR PEER (eventos globales)
-   - conexiones entrantes -> si requireFriendAccept on guardamos en pending y mostramos UI
-   - call -> respondemos si localStream existe
-   ========================================================================== */
+
 function setupPeerAfterValidation(){
   if(!peer) return;
 
@@ -521,11 +493,7 @@ function setupConn(conn){
   renderUsers();
 }
 
-/* ==========================================================================
-   Manejo de mensajes entrantes (handleData)
-   - importante: banNotice / tempBanIP
-   - revealing reason: only when admin reveals (revealReasonBtn)
-   ========================================================================== */
+
 function isBanned(pid){ return ipBanList[pid] && ipBanList[pid] > Date.now(); }
 
 function handleData(from, data){
@@ -561,7 +529,7 @@ function handleData(from, data){
     case 'revealBanReason':
       // admin decided to reveal the ban reason: show it in chat
       if(data.target && data.reason){
-        addMessage('🏠 Razón para el baneo de '+data.target.replace('chat-','')+': '+escapeHtml(data.reason),'msg-other');
+        addMessage(' Razón para el baneo de '+data.target.replace('chat-','')+': '+escapeHtml(data.reason),'msg-other');
       }
       break;
     case 'closePage':
@@ -617,11 +585,7 @@ function handleData(from, data){
   }
 }
 
-/* ==========================================================================
-   Enviar mensajes: sendMessage (chat arreglado)
-   - Comprueba si yo estoy baneado y evita enviar
-   - Incluye displayName en el objeto para que receptor muestre nombre correcto
-   ========================================================================== */
+
 function broadcast(obj){
   Object.keys(dataConns).forEach(k=>{ try{ dataConns[k].send(obj); }catch(e){} });
 }
@@ -641,9 +605,7 @@ function sendMessage(){
   messageInput.value = '';
 }
 
-/* ==========================================================================
-   Agregar amigo (manual)
-   ========================================================================== */
+
 connectFriendBtn.onclick = addFriend;
 friendInput.addEventListener('keyup', e=>{ if(e.key==='Enter') addFriend(); });
 
@@ -651,22 +613,15 @@ function addFriend(){
   const ap = friendInput.value.trim(); if(!ap) return; friendInput.value='';
   const pid = 'chat-'+ap;
   if(isBanned(pid)){ alert(ap+' está baneado temporalmente'); return; }
-  // If remote has requireFriendAccept, we'll be handled: either allowed or not
-  // Additionally send a data message friendRequest so remote knows to show UI before connection
-  // Try to connect; if fails, send friendRequest data broadcast to notify remote's pending UI.
+  
   try{
     const conn = connectToPeer(pid);
-    // If the other peer requires explicit accept, they will store incoming conn in pending and not call setupConn
-    // To ensure they see a notification we also attempt to send a friendRequest data direct (if connection opens it will be redundant)
-    // If conn is undefined (peer not reachable), still broadcast friendRequest as a hint
+    
     broadcast({type:'friendRequest',from:myId,to:pid});
   }catch(e){ console.warn('addFriend err', e); }
 }
 
-/* ==========================================================================
-   Video: ensureLocalStream, addLocalVideo, createRemoteVideo
-   - Start/Freeze/Unfreeze/Stop implemented
-   ========================================================================== */
+
 async function ensureLocalStream(){
   if(localStream) return localStream;
   try{
@@ -761,13 +716,7 @@ function hideInvitePanel(){ pendingInviteFrom = null; invitePanel.style.display 
 inviteAccept.onclick = ()=> { if(pendingInviteFrom){ acceptInvite(pendingInviteFrom); hideInvitePanel(); } };
 inviteReject.onclick = ()=> { hideInvitePanel(); };
 
-/* ==========================================================================
-   Camera freeze/unfreeze implementation (works properly):
-   - freezeLocalCamera captures frame to canvas, replaces local display,
-     creates frozenTrack via canvas.captureStream and replaces outgoing senders.
-   - unfreezeLocalCamera restores originalVideoTrack to senders.
-   - startCamera, stopCameraCompletely implemented.
-   ========================================================================== */
+
 
 startCamBtn.onclick = async ()=> {
   try{ await ensureLocalStream(); }catch(e){}
@@ -876,15 +825,7 @@ function hideRemoteOverlay(pid){
   const overlay = el.querySelector('.video-overlay'); if(overlay) overlay.remove();
 }
 
-/* ==========================================================================
-   Admin features:
-   - open with /admintools0011 -> shows password modal
-   - password = 1020 -> opens adminPanel
-   - applyBan: sends tempBanIP (no reason), banNotice (no reason)
-   - revealReasonBtn: sends revealBanReason containing reason to all peers
-   - name change: only changes displayName locally and broadcasts nameChange WITHOUT chat message
-   - connectAllBtn: attempts to connect to all known peers
-   ========================================================================== */
+
 
 function openPasswordModal(){ passwordModal.style.display = 'flex'; adminPassInput.value=''; adminPassInput.focus(); }
 function closePasswordModal(){ passwordModal.style.display = 'none'; adminPassInput.value=''; }
@@ -987,12 +928,7 @@ connectAllBtn.onclick = ()=>{
   addMessage('🔗 Se intentó conectar a todos los peers','msg-me');
 };
 
-/* ==========================================================================
-   Friend request UI handling (accept/reject)
-   - If a connection arrives and we have requireFriendAccept=true, the incoming
-     connection is stored in pendingIncomingConns and we show the small panel.
-   - On accept, we call setupConn for that conn. On reject, we close it.
-   ========================================================================== */
+
 
 function showFriendRequest(peerId){
   friendRequestPanel.style.display='block';
@@ -1082,22 +1018,7 @@ renderUsers();
 // optionally expose internal state for debugging in console
 window._p2p = { getState: ()=>({ myId, userName, displayName, knownPeers:Array.from(knownPeers), ipBanList, displayNames }) };
 
-/* ==========================================================================
-   FIN DEL SCRIPT
-   ========================================================================== */
-/* NOTAS FINALES Y RECOMENDACIONES:
-   - Esto es una implementación P2P. Para que funcione entre distintos equipos
-     necesitarás un servidor de señalización PeerJS (o usar el servidor por defecto)
-     y que los peers se puedan alcanzar.
-   - El sistema de baneo es implementado por los clientes: cada cliente respeta
-     ipBanList y cierra conexiones con el baneado. Para seguridad real y no
-     confiable a nivel de cliente, necesitas un backend autoritativo.
-   - He añadido muchos comentarios y separación lógica para que encuentres las
-     funciones a modificar si quieres extender (mute remoto, persistencia, etc).
-   - Si quieres que al revelar la razón el mensaje vaya solamente a algunos y
-     no a todos, puedo cambiar el broadcast por envíos dirigidos a conexiones concretas.
-   - Prueba en dos pestañas del navegador con PeerJS signaling operativo.
-   ========================================================================== */
+
 </script>
 </body>
 </html>
