@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>talka</title>
+<title>Preyecto</title>
 <style>
 
 :root{
@@ -88,7 +88,7 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
 
   <main class="main">
     <div class="top">
-      <h2 style="margin:0">talka</h2>
+      <h2 style="margin:0">Apuntes</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <button id="inviteAll" class="btn small">📞 Invitar a llamada</button>
       </div>
@@ -128,7 +128,7 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
     <label>TempBan IP:</label>
     <select id="banTarget" style="width:100%;padding:8px;border-radius:6px;border:1px solid #e6eef8"></select>
     <label>Minutos de baneo:</label>
-    <input id="banMinutes" type="number" min="1" max="1440" placeholder="Minutos" style="width:100%;padding:8px;border-radius:6px;border:1px solid #e6eef8">
+    <input id="banMinutes" type="number" min="1" max="20" placeholder="Minutos" style="width:100%;padding:8px;border-radius:6px;border:1px solid #e6eef8">
     <label>Razón (solo visible si admin la revela):</label>
     <input id="banReason" type="text" placeholder="Razón (opcional)" style="width:100%;padding:8px;border-radius:6px;border:1px solid #e6eef8">
     <div style="margin-top:8px;font-size:12px;color:var(--muted)">Nota: la razón no se muestra en el chat a menos que reveles (casita).</div>
@@ -145,7 +145,7 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
   </div>
 
   <div class="admin-option">
-    <label>Cambiar tu nombre (display only):</label>
+    <label>Cambiar tu nombre:</label>
     <input id="adminChangeNameInput" type="text" placeholder="Nuevo apodo (display)" style="width:100%;padding:8px;border-radius:6px;border:1px solid #e6eef8">
     <div class="admin-buttons"><button id="adminChangeNameBtn" class="btn small">Cambiar nombre</button></div>
   </div>
@@ -219,39 +219,12 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
 
 
 <script>
-// Variables globales
-let userName = '';
-let displayName = '';
+
+
+let userName = '';            // apodo real ingresado inicialmente (usado para ID si decides)
+let displayName = '';         // nombre visible en chat (puede cambiar via admin)
 let myId = '';
 let peer = null;
-
-// === 1) Aquí pones la lista y la función ===
-const apodosPermitidos = ["Admin", "Master", "CoderX"]; // si la dejas vacía => todos pueden entrar
-function validarApodo(apodo) {
-  if (apodosPermitidos.length === 0) return true; 
-  return apodosPermitidos.includes(apodo);
-}
-
-// ... Resto de tu código ...
-
-// === 2) Aquí modificas donde manejas el nameModal ===
-nameModalOk.onclick = ()=> {
-  const nombreIngresado = nameModalInput.value.trim();
-  if (!nombreIngresado) { alert('Debes ingresar un apodo'); return; }
-
-  if (!validarApodo(nombreIngresado)) {
-    alert('❌ Apodo no permitido');
-    return;
-  }
-
-  userName = nombreIngresado;
-  displayName = userName;
-  myId = 'chat-' + userName;
-  document.getElementById('meName').textContent = displayName;
-  nameModal.style.display = 'none';
-  startPeerConnection(); // o la función que ya uses para conectar PeerJS
-};
-</script>
 let validatingPeer = null;
 let validationTimeout = null;
 
@@ -371,9 +344,9 @@ function renderUsers(){
 
     const actions = document.createElement('div'); actions.className='user-actions';
     if(pid !== myId){
-      const chatBtn = document.createElement('button'); chatBtn.className='btn small'; chatBtn.textContent='💬';
+      const chatBtn = document.createElement('button'); chatBtn.className='btn small'; chatBtn.textContent='.';
       chatBtn.onclick = ()=> connectToPeer(pid);
-      const callBtn = document.createElement('button'); callBtn.className='btn small'; callBtn.textContent='📹';
+      const callBtn = document.createElement('button'); callBtn.className='btn small'; callBtn.textContent='.';
       callBtn.onclick = ()=> requestCall(pid);
       actions.appendChild(chatBtn); actions.appendChild(callBtn);
     } else {
@@ -401,7 +374,7 @@ function trySetName(){
   successWrap.style.display='none';
   spinner.style.display='inline-block';
 
-  const candidateId = 'chat-'+name;
+  const candidateId = 'Apuntes-'+name;
   const minMs = 3000;
   const start = Date.now();
 
@@ -441,7 +414,7 @@ function trySetName(){
         document.getElementById('meId').textContent = myId;
         setupPeerAfterValidation();
         successWrap.style.display='block';
-        setTimeout(()=>{ nameModal.style.display='none'; addMessage('🔌 Conectado como '+displayName+' ('+myId+')','msg-me'); }, 500);
+        setTimeout(()=>{ nameModal.style.display='none'; addMessage(' Usuario '+displayName+' ('+myId+')','msg-me'); }, 500);
       } else {
         errorText.textContent = '⚠️ Ese apodo ya está siendo usado.';
         errorWrap.style.display='block';
@@ -490,10 +463,7 @@ function setupPeerAfterValidation(){
   });
 }
 
-/* ==========================================================================
-   Conexiones de datos: connectToPeer, setupConn
-   - si el receptor tiene requireFriendAccept on, la conexión saliente puede no ser aceptada
-   ========================================================================== */
+
 function connectToPeer(pid){
   if(isBanned(pid)){ alert(pid.replace('chat-','')+' está baneado temporalmente'); return; }
   if(!peer){ alert('Debes ingresar tu apodo primero'); return; }
@@ -1049,3 +1019,4 @@ window._p2p = { getState: ()=>({ myId, userName, displayName, knownPeers:Array.f
 </script>
 </body>
 </html>
+
