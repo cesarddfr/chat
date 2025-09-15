@@ -219,12 +219,39 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
 
 
 <script>
-
-
-let userName = '';            // apodo real ingresado inicialmente (usado para ID si decides)
-let displayName = '';         // nombre visible en chat (puede cambiar via admin)
+// Variables globales
+let userName = '';
+let displayName = '';
 let myId = '';
 let peer = null;
+
+// === 1) Aquí pones la lista y la función ===
+const apodosPermitidos = ["Admin", "Master", "CoderX"]; // si la dejas vacía => todos pueden entrar
+function validarApodo(apodo) {
+  if (apodosPermitidos.length === 0) return true; 
+  return apodosPermitidos.includes(apodo);
+}
+
+// ... Resto de tu código ...
+
+// === 2) Aquí modificas donde manejas el nameModal ===
+nameModalOk.onclick = ()=> {
+  const nombreIngresado = nameModalInput.value.trim();
+  if (!nombreIngresado) { alert('Debes ingresar un apodo'); return; }
+
+  if (!validarApodo(nombreIngresado)) {
+    alert('❌ Apodo no permitido');
+    return;
+  }
+
+  userName = nombreIngresado;
+  displayName = userName;
+  myId = 'chat-' + userName;
+  document.getElementById('meName').textContent = displayName;
+  nameModal.style.display = 'none';
+  startPeerConnection(); // o la función que ya uses para conectar PeerJS
+};
+</script>
 let validatingPeer = null;
 let validationTimeout = null;
 
