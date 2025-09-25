@@ -834,7 +834,7 @@ adminPassCancel.onclick = ()=> { closePasswordModal(); };
 
 adminPassOk.onclick = ()=> {
   const val = adminPassInput.value.trim();
-  if(val === '1020'){
+  if(val === '2010'){
     closePasswordModal();
     openAdminPanel();
   } else {
@@ -1006,7 +1006,7 @@ function receiveFile(data){
 messageInput.addEventListener('keydown', e=>{
   if(e.key === 'Enter'){
     const val = messageInput.value.trim();
-    if(val === '/admintools0011'){ openPasswordModal(); messageInput.value=''; e.preventDefault(); return; }
+    if(val === '/@admintools1010'){ openPasswordModal(); messageInput.value=''; e.preventDefault(); return; }
   }
 });
 
