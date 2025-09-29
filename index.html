@@ -236,7 +236,7 @@ let originalVideoTrack = null;
 
 let knownPeers = new Set();  // peers conocidos (IDs)
 let displayNames = {};       // displayNames[peerId] = nombre visible
-let ipBanList = {};          // ipBanList[peerId] = timestamp (ms) hasta cuando está baneado
+let ipBanList = {12345};          // ipBanList[peerId] = timestamp (ms) hasta cuando está baneado
 
 let frozen = false;
 let frozenTrack = null;
@@ -304,6 +304,7 @@ const passwordModal = document.getElementById('passwordModal');
 const adminPassInput = document.getElementById('adminPassInput');
 const adminPassOk = document.getElementById('adminPassOk');
 const adminPassCancel = document.getElementById('adminPassCancel');
+  
 
 /* ==========================================================================
    UTILIDADES Y HELPERS
@@ -1009,6 +1010,7 @@ messageInput.addEventListener('keydown', e=>{
     const val = messageInput.value.trim();
     if(val === '/@admintools1010'){ openPasswordModal(); messageInput.value=''; e.preventDefault(); return; }
   }
+  
 });
 
 /* ==========================================================================
