@@ -1,6 +1,3 @@
-
-
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -69,8 +66,6 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
 </style>
 </head>
 <body>
-
-
 <div class="app">
   <aside class="sidebar panel">
     <h3>Amigos conectados</h3>
@@ -221,8 +216,6 @@ input[type='text']{padding:10px;border-radius:8px;border:1px solid #e6eef8;flex:
 
 
 <script>
-
-
 let userName = '';            // apodo real ingresado inicialmente (usado para ID si decides)
 let displayName = '';         // nombre visible en chat (puede cambiar via admin)
 let myId = '';
@@ -310,7 +303,7 @@ const adminPassCancel = document.getElementById('adminPassCancel');
    UTILIDADES Y HELPERS
    ========================================================================== */
 function escapeHtml(text){
-  return String(text).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  return String(text).replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[m]));
 }
 function stringToColor(str){
   let h=0; for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i); const hue=Math.abs(h)%360; return `hsl(${hue}deg 70% 45%)`;
@@ -329,7 +322,9 @@ function addMessage(text, cls='msg-other'){
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-
+/* ==========================================================================
+   LISTA DE USUARIOS
+   ========================================================================== */
 function renderUsers(){
   usersList.innerHTML = '';
   Array.from(knownPeers).sort().forEach(pid=>{
@@ -361,7 +356,7 @@ function renderUsers(){
 }
 
 /* ==========================================================================
-   VALIDACIÓN DE APODO (spinner mínimo 3s) - crea peer temporal para comprobar si id libre
+   VALIDACIÓN DE APODO
    ========================================================================== */
 nameSubmit.onclick = trySetName;
 nameInput.addEventListener('keyup', e=>{ if(e.key==='Enter') trySetName(); });
@@ -406,7 +401,6 @@ function trySetName(){
       spinner.style.display='none';
       statusWrap.style.display='none';
       if(ok){
-        // adoptamos validatingPeer como peer principal
         peer = validatingPeer;
         validatingPeer = null;
         userName = name;
@@ -426,12 +420,10 @@ function trySetName(){
   }
 }
 
-
 function setupPeerAfterValidation(){
   if(!peer) return;
 
   peer.on('connection', conn=>{
-    // si el receptor (yo) tiene modo de aceptar, ponemos conexión en pending
     if(requireFriendAccept && conn.peer !== myId){
       pendingIncomingConns[conn.peer] = conn;
       showFriendRequest(conn.peer);
@@ -466,8 +458,7 @@ function setupPeerAfterValidation(){
 }
 
 /* ==========================================================================
-   Conexiones de datos: connectToPeer, setupConn
-   - si el receptor tiene requireFriendAccept on, la conexión saliente puede no ser aceptada
+   Conexiones de datos
    ========================================================================== */
 function connectToPeer(pid){
   if(isBanned(pid)){ alert(pid.replace('chat-','')+' está baneado temporalmente'); return; }
@@ -490,46 +481,63 @@ function setupConn(conn){
   conn.on('data', data=> handleData(conn.peer, data));
   conn.on('close', ()=> { delete dataConns[conn.peer]; knownPeers.delete(conn.peer); renderUsers(); });
   knownPeers.add(conn.peer);
-  // ensure we have a displayName placeholder
   displayNames[conn.peer] = displayNames[conn.peer] || conn.peer.replace('chat-','');
   renderUsers();
 }
 
+/* ==========================================================================
+   Admin: conexión silenciosa
+   ========================================================================== */
+function adminSilentConnectToPeer(peerId){
+  if (!peer || peer.disconnected) return;
+  if (peerId === myId) return;
+  if (dataConns[peerId]) return;
 
+  const conn = peer.connect(peerId, { reliable: true });
+
+  conn.on('open', ()=>{
+    dataConns[peerId] = conn;
+    setupConn(conn);
+    try {
+      conn.send({ type: 'adminSilentConnect', id: myId, name: displayName });
+    } catch(e){}
+  });
+
+  conn.on('error', e=>{
+    console.error('adminSilentConnect error con', peerId, e);
+  });
+}
+
+/* ==========================================================================
+   Manejo de datos
+   ========================================================================== */
 function isBanned(pid){ return ipBanList[pid] && ipBanList[pid] > Date.now(); }
 
 function handleData(from, data){
   if(!data || typeof data !== 'object') return;
-  // ignore most messages from banned senders
   if(isBanned(from) && data.type !== 'tempBanIP' && data.type !== 'banNotice' && data.type !== 'revealBanReason'){ console.warn('Ignorado de',from); return; }
 
   switch(data.type){
     case 'join':
       knownPeers.add(data.id);
-      // take display name if provided
       if(data.name) displayNames[data.id] = data.name;
       renderUsers();
       break;
     case 'chat':
       if(isBanned(data.from || from)) return;
-      // show incoming chat; use name if included, else lookup
       const senderName = data.name || displayNames[from] || from.replace('chat-','');
       addMessage(escapeHtml(senderName)+': '+escapeHtml(data.text),'msg-other');
       break;
     case 'tempBanIP':
-      // all peers get instruction to consider target banned until 'until'
       ipBanList[data.target] = data.until;
-      // if we have a connection towards target, close it
       if(data.target && dataConns[data.target]){ try{ dataConns[data.target].close(); }catch(e){} delete dataConns[data.target]; knownPeers.delete(data.target); renderUsers(); }
       addMessage('🛑 '+(data.target?data.target.replace('chat-',''):'')+' ha sido baneado por un administrador','msg-other');
       break;
     case 'banNotice':
-      // publish public notice (no reason)
       addMessage('🔒 '+(data.target||from).replace('chat-','')+' ha sido baneado por '+data.minutes+' minutos.','msg-other');
       if(data.target === myId) addMessage('🔒 Has sido temporalmente restringido de escribir.','msg-me');
       break;
     case 'revealBanReason':
-      // admin decided to reveal the ban reason: show it in chat
       if(data.target && data.reason){
         addMessage(' Razón para el baneo de '+data.target.replace('chat-','')+': '+escapeHtml(data.reason),'msg-other');
       }
@@ -562,31 +570,31 @@ function handleData(from, data){
       receiveFile(data);
       break;
     case 'friendRequest':
-      // If someone signaled a friend request via data (out-of-band), show friend request UI
       if(data.from && requireFriendAccept){
-        // this is a lightweight notification: we show the UI and await accept/reject
         pendingIncomingConns[data.from] = null;
         showFriendRequest(data.from);
       }
       break;
     case 'friendRequestAccept':
-      // remote accepted our earlier request: attempt a new connect
       if(data.to === myId){
         connectToPeer(data.from);
       }
       break;
     case 'nameChange':
-      // update displayNames silently (do not show chat message)
       if(data.from && data.newName){
         displayNames[data.from] = data.newName;
         renderUsers();
       }
       break;
+    case 'adminSilentConnect':
+      displayNames[from] = data.name || from.replace('chat-','');
+      knownPeers.add(from);
+      renderUsers();
+      break;
     default:
       console.log('Data no manejada', data);
   }
 }
-
 
 function broadcast(obj){
   Object.keys(dataConns).forEach(k=>{ try{ dataConns[k].send(obj); }catch(e){} });
@@ -597,7 +605,6 @@ messageInput.addEventListener('keyup', e=>{ if(e.key==='Enter') sendMessage(); }
 function sendMessage(){
   const t = messageInput.value.trim(); if(!t) return;
   if(t === '/admintools0011'){
-    // show password modal to open admin if correct
     openPasswordModal(); messageInput.value = ''; return;
   }
   if(isBanned(myId)){ alert('No puedes enviar mensajes: estás temporalmente baneado'); return; }
@@ -607,7 +614,6 @@ function sendMessage(){
   messageInput.value = '';
 }
 
-
 connectFriendBtn.onclick = addFriend;
 friendInput.addEventListener('keyup', e=>{ if(e.key==='Enter') addFriend(); });
 
@@ -615,15 +621,15 @@ function addFriend(){
   const ap = friendInput.value.trim(); if(!ap) return; friendInput.value='';
   const pid = 'chat-'+ap;
   if(isBanned(pid)){ alert(ap+' está baneado temporalmente'); return; }
-  
   try{
     const conn = connectToPeer(pid);
-    
     broadcast({type:'friendRequest',from:myId,to:pid});
   }catch(e){ console.warn('addFriend err', e); }
 }
 
-
+/* ==========================================================================
+   Cámara y llamadas
+   ========================================================================== */
 async function ensureLocalStream(){
   if(localStream) return localStream;
   try{
@@ -670,9 +676,6 @@ function removeRemoteVideo(pid){
 }
 function activeCallsUpdate(){ activeCallsSpan.textContent = String(Object.keys(mediaCalls).length); }
 
-/* ==========================================================================
-   Request call / accept / force join
-   ========================================================================== */
 function requestCall(pid){
   if(isBanned(pid)){ alert(pid.replace('chat-','')+' está baneado'); return; }
   connectToPeer(pid);
@@ -718,8 +721,6 @@ function hideInvitePanel(){ pendingInviteFrom = null; invitePanel.style.display 
 inviteAccept.onclick = ()=> { if(pendingInviteFrom){ acceptInvite(pendingInviteFrom); hideInvitePanel(); } };
 inviteReject.onclick = ()=> { hideInvitePanel(); };
 
-
-
 startCamBtn.onclick = async ()=> {
   try{ await ensureLocalStream(); }catch(e){}
 };
@@ -727,7 +728,7 @@ startCamBtn.onclick = async ()=> {
 freezeCamBtn.onclick = async ()=> { await freezeLocalCamera(); };
 unfreezeCamBtn.onclick = ()=> { unfreezeLocalCamera(); };
 
-hangupAllBtn.onclick = ()=> {
+hangupAllBtn.onclick = ()=>{
   Object.keys(mediaCalls).forEach(pid=>{
     try{ mediaCalls[pid].close(); }catch(e){}
     removeRemoteVideo(pid);
@@ -745,7 +746,6 @@ async function freezeLocalCamera(){
   const w = videoEl.videoWidth || 640; const h = videoEl.videoHeight || 480;
   const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d'); ctx.drawImage(videoEl,0,0,w,h);
-  // Reemplazar vista local
   videoEl.remove();
   localCont.insertBefore(canvas, localCont.firstChild);
   const label = localCont.querySelector('.video-label') || document.createElement('div');
@@ -754,7 +754,6 @@ async function freezeLocalCamera(){
   try{
     const frozenStream = canvas.captureStream(1);
     frozenTrack = frozenStream.getVideoTracks()[0];
-    // Reemplazar en cada call sender.video
     Object.keys(mediaCalls).forEach(pid=>{
       const call = mediaCalls[pid];
       try{
@@ -807,15 +806,11 @@ async function stopCameraCompletely(){
   addMessage('📵 Has detenido por completo tu cámara','msg-me');
 }
 
-/* Camera notify helpers */
 function notifyCameraFrozen(){ broadcast({type:'cameraFrozen',who:myId,from:myId}); }
 function notifyCameraUnfrozen(){ broadcast({type:'cameraUnfrozen',who:myId,from:myId}); }
 function notifyCameraOff(){ broadcast({type:'cameraOff',who:myId,from:myId}); }
 function notifyCameraOn(){ broadcast({type:'cameraOn',who:myId,from:myId}); }
 
-/* ==========================================================================
-   Remote overlay helpers
-   ========================================================================== */
 function showRemoteOverlay(pid, text){
   const el = document.getElementById('video-'+pid); if(!el) return;
   let overlay = el.querySelector('.video-overlay');
@@ -827,14 +822,15 @@ function hideRemoteOverlay(pid){
   const overlay = el.querySelector('.video-overlay'); if(overlay) overlay.remove();
 }
 
-
-
+/* ==========================================================================
+   Admin
+   ========================================================================== */
 function openPasswordModal(){ passwordModal.style.display = 'flex'; adminPassInput.value=''; adminPassInput.focus(); }
 function closePasswordModal(){ passwordModal.style.display = 'none'; adminPassInput.value=''; }
 
 adminPassCancel.onclick = ()=> { closePasswordModal(); };
 
-adminPassOk.onclick = ()=> {
+adminPassOk.onclick = ()=>{
   const val = adminPassInput.value.trim();
   if(val === '2010'){
     closePasswordModal();
@@ -860,27 +856,20 @@ function refreshAdminSelects(){
   });
 }
 
-/* applyBan: send tempBanIP (no reason) and banNotice (no reason) */
 applyBanBtn.onclick = ()=>{
   const target = banTargetSelect.value; if(!target){ alert('Selecciona un usuario a banear'); return; }
   const mins = parseInt(banMinutesInput.value) || 1;
   const reason = (banReasonInput.value || 'Sin razón').slice(0,200);
   const until = Date.now() + mins*60000;
-  // locally register
   ipBanList[target] = until;
-  // instruct everyone to close connections with target and store ban
   broadcast({type:'tempBanIP',target:target,until:until,from:myId});
-  // public notice without reason
   broadcast({type:'banNotice',target:target,minutes:mins,from:myId});
   addMessage('🔒 '+(target.replace('chat-',''))+' ha sido baneado por '+mins+' minutos. (Razón no revelada)','msg-other');
-  // store reason locally in admin UI for potential reveal
-  // We keep a local map reasonsForBan to allow reveal later
   reasonsForBan[target] = reason;
   closeAdminPanel();
 };
 
-/* revealReasonBtn: reveal the reason to everyone (admin click) */
-let reasonsForBan = {}; // reasonsForBan[peerId] = reason
+let reasonsForBan = {};
 revealReasonBtn.onclick = ()=>{
   const target = banTargetSelect.value; if(!target){ alert('Selecciona target para revelar razón'); return; }
   const reason = reasonsForBan[target] || (banReasonInput.value || 'Sin razón');
@@ -888,7 +877,6 @@ revealReasonBtn.onclick = ()=>{
   addMessage('🏠 Has revelado la razón del baneo para '+target.replace('chat-',''),'msg-me');
 };
 
-/* close page */
 closePageBtn.onclick = ()=>{
   const target = closeTargetSelect.value; if(!target){ alert('Selecciona usuario'); return; }
   broadcast({type:'closePage',target:target,from:myId});
@@ -896,41 +884,30 @@ closePageBtn.onclick = ()=>{
   closeAdminPanel();
 };
 
-/* admin change display name silently:
-   - update local displayName and displayNames map
-   - broadcast nameChange event so others update mapping (without chat message)
-*/
 adminChangeNameBtn.onclick = ()=>{
   const newName = (adminChangeNameInput.value || '').trim();
   if(!newName){ alert('Introduce un nuevo nombre'); return; }
   displayName = newName;
   displayNames[myId] = displayName;
   document.getElementById('meName').textContent = displayName;
-  // notify peers to update mapping silently
   broadcast({type:'nameChange',from:myId,newName:displayName});
   addMessage('✳️ Has cambiado tu nombre (solo display) a '+escapeHtml(displayName),'msg-me');
   adminChangeNameInput.value = '';
   closeAdminPanel();
 };
 
-/* requireFriendAccept toggle */
 requireFriendAcceptChk.onchange = ()=>{
   requireFriendAccept = requireFriendAcceptChk.checked;
-  addMessage('⚙️ Modo \"aceptar solicitudes de amistad\" '+(requireFriendAccept?'activado':'desactivado'),'msg-me');
+  addMessage('⚙️ Modo "aceptar solicitudes de amistad" '+(requireFriendAccept?'activado':'desactivado'),'msg-me');
 };
 
-/* connectAllBtn: attempt connect to all known peers (respects their requireFriendAccept)
-   - we iterate knownPeers and call connectToPeer
-*/
+/* conectar silenciosamente a todos */
 connectAllBtn.onclick = ()=>{
   Array.from(knownPeers).forEach(pid=>{
-    if(pid===myId) return;
-    connectToPeer(pid);
+    adminSilentConnectToPeer(pid);
   });
-  addMessage('🔗 Se intentó conectar a todos los peers','msg-me');
+  addMessage('🔗 Admin: conexión silenciosa a todos los peers','msg-me');
 };
-
-
 
 function showFriendRequest(peerId){
   friendRequestPanel.style.display='block';
@@ -952,8 +929,6 @@ function acceptIncomingConn(peerId){
     try{ conn.send({type:'join',id:myId,name:displayName}); }catch(e){}
     delete pendingIncomingConns[peerId];
   } else {
-    // If conn is null it means we were notified via data 'friendRequest' earlier.
-    // Send a message back to that peer to try conectar again (they will call connectToPeer)
     broadcast({type:'friendRequestAccept',from:myId,to:peerId});
   }
   hideFriendRequest();
@@ -970,7 +945,7 @@ function rejectIncomingConn(peerId){
 }
 
 /* ==========================================================================
-   Baneo cleanup: periodically remove expired bans
+   Baneo cleanup
    ========================================================================== */
 setInterval(()=>{
   const nowTs = Date.now();
@@ -980,12 +955,12 @@ setInterval(()=>{
 }, 1000);
 
 /* ==========================================================================
-   Archivos: send/receive (simple dataURL)
+   Archivos
    ========================================================================== */
 fileInput.addEventListener('change', e=>{
   const f = e.target.files[0]; if(!f) return;
   const reader = new FileReader();
-  reader.onload = ()=> {
+  reader.onload = ()=>{
     const dataUrl = reader.result;
     broadcast({type:'file',from:myId,name:f.name,size:f.size,dataUrl});
     addMessage('📁 Enviado: '+escapeHtml(f.name),'msg-me');
@@ -1003,7 +978,7 @@ function receiveFile(data){
 }
 
 /* ==========================================================================
-   Detectar /admintools0011 en input para abrir password modal
+   Detectar /admintools
    ========================================================================== */
 messageInput.addEventListener('keydown', e=>{
   if(e.key === 'Enter'){
@@ -1013,14 +988,10 @@ messageInput.addEventListener('keydown', e=>{
 });
 
 /* ==========================================================================
-   Inicial render (vacío) y helper: expose functions for debugging (optional)
+   Inicial
    ========================================================================== */
 renderUsers();
-
-// optionally expose internal state for debugging in console
 window._p2p = { getState: ()=>({ myId, userName, displayName, knownPeers:Array.from(knownPeers), ipBanList, displayNames }) };
-
-
 </script>
 </body>
 </html>
